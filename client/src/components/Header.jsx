@@ -14,7 +14,7 @@ export default function Header({ user, route, onLogout }) {
     );
 
     return (
-        <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
+        <header className="app-header bg-white border-b border-slate-200 sticky top-0 z-50">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
                 <button onClick={() => navigate('/')} className="flex items-center gap-3 text-left">
                     <div className="bg-[var(--primary)] p-2 rounded-lg">
@@ -26,10 +26,12 @@ export default function Header({ user, route, onLogout }) {
                     </div>
                 </button>
 
-                {user && user.role !== 'patient' && (
+                {user && (
                     <nav className="hidden md:flex items-center gap-1">
-                        {navLink('/', 'Patients', 'icon-users')}
+                        {user.role === 'patient' ? navLink('/', 'My check-in', 'icon-clipboard-pen') : navLink('/', 'Patients', 'icon-users')}
+                        {user.role !== 'patient' && navLink('/methodology', 'Scoring', 'icon-book-open')}
                         {user.role === 'admin' && navLink('/admin', 'Admin', 'icon-settings')}
+                        {navLink('/account', 'Account', 'icon-circle-user')}
                     </nav>
                 )}
 
@@ -57,10 +59,12 @@ export default function Header({ user, route, onLogout }) {
                     </div>
                 )}
             </div>
-            {user && user.role === 'admin' && (
-                <nav className="md:hidden flex gap-1 px-4 pb-2">
-                    {navLink('/', 'Patients', 'icon-users')}
-                    {navLink('/admin', 'Admin', 'icon-settings')}
+            {user && (
+                <nav className="md:hidden flex gap-1 px-4 pb-2 overflow-x-auto">
+                    {user.role === 'patient' ? navLink('/', 'Check-in', 'icon-clipboard-pen') : navLink('/', 'Patients', 'icon-users')}
+                    {user.role !== 'patient' && navLink('/methodology', 'Scoring', 'icon-book-open')}
+                    {user.role === 'admin' && navLink('/admin', 'Admin', 'icon-settings')}
+                    {navLink('/account', 'Account', 'icon-circle-user')}
                 </nav>
             )}
         </header>

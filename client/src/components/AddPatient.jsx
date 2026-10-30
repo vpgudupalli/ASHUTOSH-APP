@@ -2,7 +2,7 @@ import React from 'react';
 import { api } from '../api.js';
 
 export default function AddPatient({ onClose, onCreated }) {
-    const [form, setForm] = React.useState({ name: '', dob: '', email: '', password: '' });
+    const [form, setForm] = React.useState({ name: '', dob: '', mrn: '', phone: '', email: '', password: '' });
     const [error, setError] = React.useState('');
     const [busy, setBusy] = React.useState(false);
     const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -31,6 +31,10 @@ export default function AddPatient({ onClose, onCreated }) {
                     <label>Date of birth</label>
                     <input type="date" value={form.dob} onChange={set('dob')} />
                 </div>
+                <div className="grid grid-cols-2 gap-3">
+                    <div><label>MRN (EMR)</label><input type="text" value={form.mrn} onChange={set('mrn')} /></div>
+                    <div><label>Phone</label><input type="text" value={form.phone} onChange={set('phone')} /></div>
+                </div>
                 <div className="bg-slate-50 border border-slate-100 rounded-lg p-3 space-y-3">
                     <p className="text-xs text-slate-500">Optional: give the patient a login so they can enter their own data.</p>
                     <div>
@@ -40,7 +44,7 @@ export default function AddPatient({ onClose, onCreated }) {
                     {form.email && (
                         <div>
                             <label>Temporary password</label>
-                            <input type="text" value={form.password} onChange={set('password')} minLength={8} required />
+                            <input type="text" value={form.password} onChange={set('password')} minLength={10} required />
                         </div>
                     )}
                 </div>

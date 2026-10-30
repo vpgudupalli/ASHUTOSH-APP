@@ -58,3 +58,12 @@
         @apply bg-white border border-slate-200 hover:bg-slate-50 text-slate-700;
     }
 }
+
+/* Printable report: hide app chrome, print only the report page. */
+@media print {
+    @page { size: letter; margin: 0.5in; }
+    body { background: white !important; }
+    header.app-header, footer.app-footer, .no-print, .toasts { display: none !important; }
+    main > div { padding: 0 !important; max-width: none !important; }
+    .print-page { box-shadow: none !important; border: none !important; padding: 0 !important; max-width: none !important; }
+}

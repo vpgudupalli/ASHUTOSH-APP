@@ -9,6 +9,9 @@ export async function api(path, { method = 'GET', body } = {}) {
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
+    // Let the app react to an expired session or required MFA setup wherever it happens.
+    if (res.status === 401 && !path.startsWith('/auth/')) window.dispatchEvent(new Event('session-expired'));
+    if (data.code === 'MFA_SETUP_REQUIRED') window.dispatchEvent(new Event('mfa-required'));
     const err = new Error(data.error || `Request failed (${res.status})`);
     err.status = res.status;
     throw err;

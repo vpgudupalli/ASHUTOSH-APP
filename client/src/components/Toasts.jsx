@@ -15,7 +15,7 @@ export function useToasts() {
 
 export default function Toasts({ toasts, dismiss }) {
     return (
-        <div className="fixed top-20 right-4 z-[60] flex flex-col gap-2 w-80 max-w-[calc(100vw-2rem)]">
+        <div className="toasts fixed top-20 right-4 z-[60] flex flex-col gap-2 w-80 max-w-[calc(100vw-2rem)]">
             {toasts.map((t) => {
                 const style = t.risk ? RISK_STYLES[t.risk] : null;
                 return (

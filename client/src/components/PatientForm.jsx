@@ -1,647 +1,265 @@
 import React from 'react';
-import RiskIndicator from './RiskIndicator.jsx';
 import {
-    calculateRisk,
-    INITIAL_PATIENT_STATE,
-    CHRONIC_CONDITIONS_LIST,
-    MSK_RED_FLAGS_LIST,
+    scoreAssessment, INITIAL_ASSESSMENT, CONDITIONS, URGENT_SYMPTOMS, DISABILITIES, ADLS, PAIN_RED_FLAGS,
+    PHQ9_ITEMS, GAD7_ITEMS, FREQ_OPTIONS, AUDITC_ITEMS, PEG_ITEMS, bmi, bpCategory, PHQ9_BANDS, GAD7_BANDS,
 } from '../../../shared/risk.js';
+import { Chips, CheckList, Num, Question, FrequencyGrid, Section } from './Fields.jsx';
+import RiskBadge from './RiskBadge.jsx';
 
-export default function PatientForm({ initial, onSave, saving, savedAt }) {
+const SECTIONS = [
+    { id: 'today', label: 'Today', icon: 'icon-heart-pulse', domains: ['symptoms'] },
+    { id: 'about', label: 'About me', icon: 'icon-user', domains: [] },
+    { id: 'vitals', label: 'Vitals', icon: 'icon-activity', domains: ['vitals'] },
+    { id: 'conditions', label: 'Conditions & meds', icon: 'icon-pill', domains: ['conditions', 'medications'] },
+    { id: 'care', label: 'Hospital & ED', icon: 'icon-hospital', domains: ['utilization'] },
+    { id: 'function', label: 'Daily living', icon: 'icon-accessibility', domains: ['function'] },
+    { id: 'lifestyle', label: 'Lifestyle', icon: 'icon-footprints', domains: ['lifestyle', 'substance'] },
+    { id: 'mental', label: 'Mood', icon: 'icon-brain', domains: ['mental'] },
+    { id: 'pain', label: 'Pain', icon: 'icon-bone', domains: ['pain'] },
+    { id: 'sexual', label: 'Sexual health', icon: 'icon-heart-handshake', domains: ['sexual'] },
+    { id: 'social', label: 'Home & resources', icon: 'icon-home', domains: ['sdoh'] },
+    { id: 'note', label: 'Message', icon: 'icon-message-square', domains: [] },
+];
 
-    const [patient, setPatient] = React.useState(() => ({ ...INITIAL_PATIENT_STATE, ...initial }));
+const YN = ['Yes', 'No'];
 
+export default function PatientForm({ initial, onSave, saving, isPatient }) {
+    const [d, setD] = React.useState(() => ({ ...INITIAL_ASSESSMENT, ...initial, patientNote: '', wantsCallback: false, urgentSymptoms: [], feelingToday: '' }));
+    const set = (field) => (value) => setD((prev) => ({ ...prev, [field]: value }));
+    const result = React.useMemo(() => scoreAssessment(d), [d]);
+    const assessed = Object.fromEntries(result.domains.map((x) => [x.key, x.assessed]));
+    const sectionDone = (s) => s.domains.length > 0 && s.domains.some((k) => assessed[k]);
 
-    const risk = calculateRisk(patient);
-
-    const toggleCondition = (condition) => {
-        setPatient(prev => ({
-            ...prev,
-            chronicConditions: prev.chronicConditions.includes(condition)
-                ? prev.chronicConditions.filter(c => c !== condition)
-                : [...prev.chronicConditions, condition]
-        }));
-    };
-    
-    const toggleRedFlag = (flag) => {
-        setPatient(prev => ({
-            ...prev,
-            msk_redFlags: prev.msk_redFlags.includes(flag)
-                ? prev.msk_redFlags.filter(f => f !== flag)
-                : [...prev.msk_redFlags, flag]
-        }));
-    };
-
-    const handleChange = (field, value) => {
-        setPatient(prev => {
-            const newState = { ...prev, [field]: value };
-            
-            // Auto-calculate BMI if height or weight changes
-            if (field === 'height' || field === 'weight') {
-                const h = field === 'height' ? value : prev.height;
-                const w = field === 'weight' ? value : prev.weight;
-                if (h && w) {
-                    const heightInMeters = h / 100;
-                    const calculatedBMI = (w / (heightInMeters * heightInMeters)).toFixed(1);
-                    newState.bmi = calculatedBMI;
-                }
-            }
-            
-            // Auto-calculate Age if DOB changes
-            if (field === 'dob') {
-                if (value) {
-                    const dobDate = new Date(value);
-                    const today = new Date();
-                    let age = today.getFullYear() - dobDate.getFullYear();
-                    const m = today.getMonth() - dobDate.getMonth();
-                    if (m < 0 || (m === 0 && today.getDate() < dobDate.getDate())) {
-                        age--;
-                    }
-                    newState.age = age;
-                }
-            }
-
-            return newState;
-        });
-    };
-
-    // Helper to get depression severity label
-    const getPHQ9Severity = (score) => {
-        if (score >= 20) return { label: "Severe", color: "text-red-600" };
-        if (score >= 15) return { label: "Moderately Severe", color: "text-orange-600" };
-        if (score >= 10) return { label: "Moderate", color: "text-yellow-600" };
-        if (score >= 5) return { label: "Mild", color: "text-blue-600" };
-        return { label: "None/Minimal", color: "text-slate-500" };
-    };
-
-    const phq9Status = getPHQ9Severity(patient.phq9);
-
-    // Helper for HbA1c Status
-    const getHbA1cStatus = (val) => {
-        if (!val) return { label: "Not Entered", color: "text-slate-400" };
-        if (val > 8.0) return { label: "Poor Control (>8.0)", color: "text-red-600 font-bold" };
-        if (val >= 7.0) return { label: "Intermediate (7.0-8.0)", color: "text-yellow-600 font-bold" };
-        return { label: "Good Control (<7.0)", color: "text-green-600 font-bold" };
-    };
-    const hba1cStatus = getHbA1cStatus(patient.hbA1c);
-
-    // Helper for BP Status
-    const getBPStatus = (sys, dia) => {
-        if (!sys || !dia) return { label: "", color: "text-slate-400" };
-        
-        if (sys >= 180 || dia >= 120) {
-            return { label: "Hypertensive Crisis", color: "text-red-700 font-bold" };
-        }
-        if (sys >= 160 || dia >= 100) {
-            return { label: "Severe HTN (Stage 2+)", color: "text-orange-600 font-bold" };
-        }
-        if (sys >= 140 || dia >= 90) {
-            return { label: "Stage 2 HTN", color: "text-yellow-600 font-bold" };
-        }
-        if (sys >= 130 || dia >= 80) {
-            return { label: "Stage 1 HTN", color: "text-yellow-500" };
-        }
-        if (sys >= 120 && dia < 80) {
-            return { label: "Elevated", color: "text-blue-600" };
-        }
-        return { label: "Normal", color: "text-green-600" };
-    };
-
-    const bpStatus = getBPStatus(patient.bpSystolic, patient.bpDiastolic);
+    const b = bmi(d);
+    const bpCat = bpCategory(d.bpSystolic === '' ? null : Number(d.bpSystolic), d.bpDiastolic === '' ? null : Number(d.bpDiastolic));
+    const phq9Total = result.derived.phq9;
+    const gadTotal = result.derived.gad7;
+    const item9 = Number(d.phq?.[8]) > 0;
+    const you = isPatient ? 'you' : 'the patient';
+    const your = isPatient ? 'your' : "the patient's";
 
     return (
-        <div className="pb-28" data-name="patient-form">
-
-            <RiskIndicator risk={risk} date={savedAt} />
-
-            {onSave && (
-                <div className="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-slate-200 shadow-[0_-4px_12px_rgba(0,0,0,0.04)]">
-                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-4">
-                        <div className="text-sm text-slate-500">
-                            Calculated risk: <span className="font-semibold text-slate-800">{risk}</span>
-                            <span className="hidden sm:inline"> · Saving shares this with the care team instantly.</span>
-                        </div>
-                        <button
-                            onClick={() => onSave(patient)}
-                            disabled={saving}
-                            className="px-5 py-2.5 rounded-lg bg-[var(--primary)] hover:bg-[var(--primary-dark)] text-white font-medium disabled:opacity-60 flex items-center gap-2"
-                        >
-                            <div className="icon-save"></div>
-                            {saving ? 'Saving…' : 'Save Assessment'}
-                        </button>
-                    </div>
+        <div className="lg:grid lg:grid-cols-[200px_1fr] gap-6 pb-28" data-name="patient-form">
+            {/* Section navigation */}
+            <nav className="hidden lg:block">
+                <div className="sticky top-24 space-y-0.5">
+                    {SECTIONS.map((s) => (
+                        <a key={s.id} href={`#${s.id}`} onClick={(e) => { e.preventDefault(); document.getElementById(s.id)?.scrollIntoView({ behavior: 'smooth' }); }}
+                            className="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm text-slate-600 hover:bg-white hover:text-slate-900">
+                            <span className={`${s.icon} text-slate-400`}></span>
+                            <span className="flex-1">{s.label}</span>
+                            {sectionDone(s) && <span className="icon-circle-check text-green-500 text-xs"></span>}
+                        </a>
+                    ))}
                 </div>
-            )}
+            </nav>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                
-                {/* Left Column - Demographics, Vitals & Clinical History */}
-                <div className="lg:col-span-2 space-y-8">
-                    
-                    {/* Demographics Section */}
-                    <div className="card">
-                        <div className="section-title">
-                            <div className="icon-user text-[var(--primary)]"></div>
-                            <h3>Patient Demographics</h3>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <label>Patient Name</label>
-                                <input 
-                                    type="text" 
-                                    value={patient.name} 
-                                    onChange={e => handleChange('name', e.target.value)}
-                                    placeholder="Enter full name"
-                                />
-                            </div>
-                            <div>
-                                <label>Date of Birth</label>
-                                <input 
-                                    type="date" 
-                                    value={patient.dob}
-                                    onChange={e => handleChange('dob', e.target.value)}
-                                />
-                            </div>
-                        </div>
+            <div className="space-y-6 min-w-0">
+                {(result.emergency || item9) && (
+                    <div className="rounded-xl border-2 border-red-300 bg-red-50 p-4 text-red-900">
+                        <div className="font-bold flex items-center gap-2 text-lg"><span className="icon-siren"></span>{isPatient ? 'If this is happening now, get help right away' : 'Urgent safety finding'}</div>
+                        <ul className="mt-2 text-sm space-y-1 list-disc pl-5">
+                            {result.emergency && <li>For chest pain, trouble breathing, stroke signs, fainting or severe bleeding: <b>call 911</b> or go to the nearest emergency room.</li>}
+                            {(item9 || d.urgentSymptoms.includes('selfharm')) && <li>For thoughts of hurting yourself: call or text <b>988</b> (Suicide &amp; Crisis Lifeline), available 24/7.</li>}
+                            <li>{isPatient ? 'Saving this check-in alerts your care team immediately, but do not wait for them in an emergency.' : 'Care team must contact the patient today.'}</li>
+                        </ul>
                     </div>
+                )}
 
-                    {/* Vitals Section (New) */}
-                    <div className="card">
-                        <div className="section-title">
-                            <div className="icon-heart-pulse text-[var(--primary)]"></div>
-                            <h3>Vitals & Measurements</h3>
-                        </div>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                            <div>
-                                <label>Age</label>
-                                <input 
-                                    type="number" 
-                                    value={patient.age} 
-                                    onChange={e => handleChange('age', e.target.value)}
-                                    placeholder="Yrs"
-                                />
-                            </div>
-                            <div>
-                                <label>Sex</label>
-                                <select value={patient.sex} onChange={e => handleChange('sex', e.target.value)}>
-                                    <option>Male</option>
-                                    <option>Female</option>
-                                    <option>Other</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label>Height (cm)</label>
-                                <input 
-                                    type="number" 
-                                    value={patient.height} 
-                                    onChange={e => handleChange('height', e.target.value)}
-                                    placeholder="cm"
-                                />
-                            </div>
-                            <div>
-                                <label>Weight (kg)</label>
-                                <input 
-                                    type="number" 
-                                    value={patient.weight} 
-                                    onChange={e => handleChange('weight', e.target.value)}
-                                    placeholder="kg"
-                                />
-                            </div>
-                            <div>
-                                <label>BMI</label>
-                                <input 
-                                    type="number" 
-                                    value={patient.bmi} 
-                                    readOnly
-                                    className="bg-slate-100 cursor-not-allowed"
-                                    placeholder="Calc."
-                                />
-                            </div>
-                            
-                            <div className="col-span-2 md:col-span-2 bg-slate-50 p-3 rounded-lg border border-slate-100">
-                                <label className="mb-2 block text-slate-700 font-semibold text-xs uppercase tracking-wide">Blood Pressure</label>
-                                <div className="flex gap-2 items-center">
-                                    <div className="w-1/2">
-                                        <input 
-                                            type="number" 
-                                            value={patient.bpSystolic} 
-                                            onChange={e => handleChange('bpSystolic', Number(e.target.value))}
-                                            placeholder="SYS"
-                                            className="text-center"
-                                        />
-                                    </div>
-                                    <span className="text-slate-400">/</span>
-                                    <div className="w-1/2">
-                                        <input 
-                                            type="number" 
-                                            value={patient.bpDiastolic} 
-                                            onChange={e => handleChange('bpDiastolic', Number(e.target.value))}
-                                            placeholder="DIA"
-                                            className="text-center"
-                                        />
-                                    </div>
-                                </div>
-                                <div className={`text-xs mt-1 text-center min-h-[1rem] ${bpStatus.color}`}>
-                                    {bpStatus.label}
-                                </div>
-                            </div>
+                <Section id="today" icon="icon-heart-pulse" title="How are you feeling today?" done={sectionDone(SECTIONS[0])}>
+                    <Chips options={['Good', 'Okay', 'Not well', 'Very unwell']} value={d.feelingToday} onChange={set('feelingToday')} />
+                    <Question label={`Do ${you} have any of these right now?`} help="Select any that apply. These are emergency warning signs.">
+                        <CheckList items={URGENT_SYMPTOMS} value={d.urgentSymptoms} onChange={set('urgentSymptoms')} tone="red" />
+                    </Question>
+                </Section>
 
-                            <div>
-                                <label>HbA1c Level (%)</label>
-                                <div className="relative mb-1">
-                                    <input 
-                                        type="number" step="0.1" 
-                                        value={patient.hbA1c} 
-                                        onChange={e => handleChange('hbA1c', Number(e.target.value))} 
-                                    />
-                                </div>
-                                <div className={`text-xs ${hba1cStatus.color}`}>
-                                    {hba1cStatus.label}
-                                </div>
-                            </div>
-                        </div>
+                <Section id="about" icon="icon-user" title="About me">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div><label>Full name</label><input type="text" value={d.name} onChange={(e) => set('name')(e.target.value)} /></div>
+                        <div><label>Date of birth</label><input type="date" value={d.dob} onChange={(e) => set('dob')(e.target.value)} /></div>
+                        <div><label>Phone</label><input type="text" inputMode="tel" value={d.phone} onChange={(e) => set('phone')(e.target.value)} placeholder="(555) 555-5555" /></div>
+                        <div><label>Preferred language</label><input type="text" value={d.preferredLanguage} onChange={(e) => set('preferredLanguage')(e.target.value)} /></div>
                     </div>
+                    <Question label="Sex assigned at birth"><Chips options={['Female', 'Male', 'Intersex / other']} value={d.sex} onChange={set('sex')} /></Question>
+                    <Question label="Best way for the care team to reach me"><Chips options={['Phone call', 'Text message', 'App message', 'Email']} value={d.preferredContact} onChange={set('preferredContact')} /></Question>
+                    <div className="max-w-sm"><label>Best time to reach me</label><input type="text" value={d.bestTime} onChange={(e) => set('bestTime')(e.target.value)} placeholder="e.g. weekdays after 3pm" /></div>
+                </Section>
 
-                    {/* Chronic Conditions */}
-                    <div className="card">
-                        <div className="section-title">
-                            <div className="icon-activity text-[var(--primary)]"></div>
-                            <h3>Chronic Conditions</h3>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                            {CHRONIC_CONDITIONS_LIST.map(c => (
-                                <label key={c} className={`flex items-center p-3 rounded-lg border cursor-pointer transition-all ${patient.chronicConditions.includes(c) ? 'border-[var(--primary)] bg-sky-50' : 'border-slate-200 hover:bg-slate-50'}`}>
-                                    <input 
-                                        type="checkbox" 
-                                        className="mr-3"
-                                        checked={patient.chronicConditions.includes(c)} 
-                                        onChange={() => toggleCondition(c)} 
-                                    />
-                                    <span className={`text-sm ${patient.chronicConditions.includes(c) ? 'font-medium text-[var(--primary-dark)]' : 'text-slate-600'}`}>{c}</span>
-                                </label>
-                            ))}
-                        </div>
+                <Section id="vitals" icon="icon-activity" title="Vitals & measurements" subtitle="Fill in whatever you have. Leave blank anything you don't know." done={sectionDone(SECTIONS[2])}>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <Num label="Height (feet)" value={d.heightFt} onChange={set('heightFt')} unit="ft" max={8} />
+                        <Num label="Height (inches)" value={d.heightIn} onChange={set('heightIn')} unit="in" max={11} />
+                        <Num label="Weight" value={d.weightLb} onChange={set('weightLb')} unit="lb" />
+                        <div><label>BMI</label><input type="text" readOnly value={b ?? ''} placeholder="Auto" className="bg-slate-100" /></div>
                     </div>
-                    
-                    {/* Musculoskeletal Pain Assessment */}
-                    <div className="card border-l-4 border-l-slate-400">
-                        <div className="section-title">
-                            <div className="icon-bone text-[var(--primary)]"></div>
-                            <h3>Musculoskeletal Pain Assessment</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <Num label="Blood pressure – top" value={d.bpSystolic} onChange={set('bpSystolic')} unit="mmHg" placeholder="e.g. 128" />
+                        <Num label="Blood pressure – bottom" value={d.bpDiastolic} onChange={set('bpDiastolic')} unit="mmHg" placeholder="e.g. 82"
+                            hint={bpCat && <span className={/Severe|≥160/.test(bpCat) ? 'text-red-600 font-semibold' : /Stage/.test(bpCat) ? 'text-orange-600' : 'text-slate-500'}>{bpCat}</span>} />
+                        <Num label="Heart rate" value={d.heartRate} onChange={set('heartRate')} unit="bpm" />
+                        <Num label="Oxygen level" value={d.spo2} onChange={set('spo2')} unit="%" max={100} />
+                        <Num label="Temperature" value={d.tempF} onChange={set('tempF')} unit="°F" step="0.1" />
+                        <Num label="Blood sugar" value={d.glucose} onChange={set('glucose')} unit="mg/dL" />
+                        <div><label>Blood sugar taken</label>
+                            <select value={d.glucoseContext} onChange={(e) => set('glucoseContext')(e.target.value)}>
+                                <option value="">—</option><option>Fasting</option><option>Before a meal</option><option>After a meal</option><option>Random</option>
+                            </select>
                         </div>
-                        
-                        <div className="mb-4">
-                            <label className="flex items-center cursor-pointer">
-                                <input 
-                                    type="checkbox" 
-                                    className="mr-3 h-5 w-5"
-                                    checked={patient.msk_hasComplaint} 
-                                    onChange={e => handleChange('msk_hasComplaint', e.target.checked)} 
-                                />
-                                <span className="font-medium text-slate-900">Does patient have a musculoskeletal complaint?</span>
-                            </label>
-                        </div>
+                        <Num label="Last HbA1c" value={d.hbA1c} onChange={set('hbA1c')} unit="%" step="0.1" hint={d.hbA1c !== '' && <span className="text-slate-500">{Number(d.hbA1c) > 9 ? 'Poor control' : Number(d.hbA1c) >= 7 ? 'Above goal' : 'At goal (<7%)'}</span>} />
+                    </div>
+                </Section>
 
-                        {patient.msk_hasComplaint && (
-                            <div className="animate-in fade-in slide-in-from-top-4 duration-300 space-y-6 pt-4 border-t border-slate-100">
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                    <div>
-                                        <label className="flex justify-between">
-                                            Pain Score (0-10)
-                                            <span className={`text-xs font-bold px-2 py-0.5 rounded ${patient.msk_painScore >= 8 ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-500'}`}>
-                                                {patient.msk_painScore}
-                                            </span>
-                                        </label>
-                                        <input 
-                                            type="range" min="0" max="10" step="1"
-                                            value={patient.msk_painScore} 
-                                            onChange={e => handleChange('msk_painScore', Number(e.target.value))}
-                                            className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-[var(--primary)]"
-                                        />
-                                        <div className="flex justify-between text-xs text-slate-400 mt-1">
-                                            <span>No Pain</span>
-                                            <span>Severe</span>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label>Duration (Weeks)</label>
-                                        <input 
-                                            type="number" min="0"
-                                            value={patient.msk_durationWeeks} 
-                                            onChange={e => handleChange('msk_durationWeeks', Number(e.target.value))}
-                                            placeholder="Weeks"
-                                        />
-                                    </div>
-                                    <div className="flex items-end pb-2">
-                                        <label className="flex items-center cursor-pointer p-2 bg-slate-50 rounded-md border border-slate-200 w-full hover:bg-slate-100 transition-colors">
-                                            <input 
-                                                type="checkbox" 
-                                                className="mr-3"
-                                                checked={patient.msk_painAtRestOrNight} 
-                                                onChange={e => handleChange('msk_painAtRestOrNight', e.target.checked)} 
-                                            />
-                                            <span className="text-sm">Pain at Rest / Night?</span>
-                                        </label>
-                                    </div>
-                                </div>
+                <Section id="conditions" icon="icon-pill" title="Health conditions & medications" done={sectionDone(SECTIONS[3])}>
+                    <Question label={`Which conditions ${isPatient ? 'have you been told you have' : 'does the patient have'}?`}>
+                        <CheckList items={CONDITIONS} value={d.conditions} onChange={set('conditions')} cols={3} />
+                    </Question>
+                    <div><label>Other conditions</label><input type="text" value={d.otherConditions} onChange={(e) => set('otherConditions')(e.target.value)} placeholder="Anything not listed above" /></div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <Num label="How many prescription medicines do you take daily?" value={d.medCount} onChange={set('medCount')} />
+                    </div>
+                    <Question label="How often do you take your medicines as prescribed?">
+                        <Chips options={[{ key: 'Good', label: 'Always / almost always' }, { key: 'Fair', label: 'Sometimes miss' }, { key: 'Poor', label: 'Often miss' }]} value={d.medicationAdherence} onChange={set('medicationAdherence')} />
+                    </Question>
+                    <div><label>Any problems with your medicines? (cost, side effects, refills)</label><input type="text" value={d.medicationConcerns} onChange={(e) => set('medicationConcerns')(e.target.value)} /></div>
+                </Section>
 
-                                <div className="bg-red-50 p-4 rounded-lg border border-red-100">
-                                    <h4 className="text-red-800 text-sm font-bold mb-3 flex items-center gap-2">
-                                        <div className="icon-triangle-alert w-4 h-4"></div>
-                                        Red Flags Checklist
-                                    </h4>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                                        {MSK_RED_FLAGS_LIST.map(flag => (
-                                            <label key={flag} className="flex items-center cursor-pointer">
-                                                <input 
-                                                    type="checkbox" 
-                                                    className="mr-2 text-red-600 focus:ring-red-500"
-                                                    checked={patient.msk_redFlags.includes(flag)} 
-                                                    onChange={() => toggleRedFlag(flag)} 
-                                                />
-                                                <span className="text-sm text-red-900">{flag}</span>
-                                            </label>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
+                <Section id="care" icon="icon-hospital" title="Hospital, ER & appointments" done={sectionDone(SECTIONS[4])}>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <Num label="ER / ED visits – last 30 days" value={d.edVisits30d} onChange={set('edVisits30d')} />
+                        <Num label="Hospital stays – last 90 days" value={d.hospitalizations90d} onChange={set('hospitalizations90d')} />
+                        <Num label="Missed appointments – last 6 months" value={d.missedAppointments} onChange={set('missedAppointments')} />
+                    </div>
+                </Section>
+
+                <Section id="function" icon="icon-accessibility" title="Daily living, falls & disabilities" done={sectionDone(SECTIONS[5])}>
+                    <Question label="Do you need help from another person with any of these?">
+                        <CheckList items={ADLS} value={d.adlHelp} onChange={set('adlHelp')} cols={3} />
+                    </Question>
+                    <Question label="Do you use a mobility aid?"><Chips options={['None', 'Cane', 'Walker', 'Wheelchair', 'Scooter']} value={d.mobilityAid} onChange={set('mobilityAid')} /></Question>
+                    <Question label="How many times have you fallen in the past 12 months?">
+                        <Chips options={['0', '1', '2+']} value={d.falls12mo} onChange={set('falls12mo')} />
+                        {d.falls12mo && d.falls12mo !== '0' && (
+                            <label className="!mb-0 flex items-center gap-2 text-sm font-normal"><input type="checkbox" checked={d.fallInjury} onChange={(e) => set('fallInjury')(e.target.checked)} />I was injured in a fall</label>
                         )}
+                    </Question>
+                    <Question label="Do you have any of these disabilities or limitations?" help="This helps your care team communicate with you the best way.">
+                        <CheckList items={DISABILITIES} value={d.disabilities} onChange={set('disabilities')} />
+                    </Question>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <Question label="Do you live alone?"><Chips options={YN} value={d.livesAlone} onChange={set('livesAlone')} /></Question>
+                        <Question label="Do you have a caregiver or someone who helps you?"><Chips options={YN} value={d.hasCaregiver} onChange={set('hasCaregiver')} /></Question>
                     </div>
+                </Section>
 
-                    {/* Utilization & Adherence */}
-                    <div className="card">
-                        <div className="section-title">
-                            <div className="icon-hospital text-[var(--primary)]"></div>
-                            <h3>Utilization & Adherence</h3>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <label>ED Visits (Last 30 Days)</label>
-                                <input 
-                                    type="number" min="0" 
-                                    value={patient.edVisitsLast30Days} 
-                                    onChange={e => handleChange('edVisitsLast30Days', Number(e.target.value))} 
-                                />
-                            </div>
-                            <div>
-                                <label>Hospitalizations (Last 90 Days)</label>
-                                <input 
-                                    type="number" min="0"
-                                    value={patient.hospitalizationsLast90Days} 
-                                    onChange={e => handleChange('hospitalizationsLast90Days', Number(e.target.value))} 
-                                />
-                            </div>
-                            <div>
-                                <label>Missed Appointments</label>
-                                <input 
-                                    type="number" min="0"
-                                    value={patient.missedAppointments} 
-                                    onChange={e => handleChange('missedAppointments', Number(e.target.value))} 
-                                />
-                            </div>
-                            <div>
-                                <label>Medication Adherence</label>
-                                <select 
-                                    value={patient.medicationAdherence} 
-                                    onChange={e => handleChange('medicationAdherence', e.target.value)}
-                                >
-                                    <option>Good</option>
-                                    <option>Fair</option>
-                                    <option>Poor</option>
-                                </select>
-                            </div>
-                        </div>
+                <Section id="lifestyle" icon="icon-footprints" title="Lifestyle" done={sectionDone(SECTIONS[6])}>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <Num label="Days per week you exercise (brisk walk or more)" value={d.activityDays} onChange={set('activityDays')} max={7} />
+                        <Num label="Minutes each time" value={d.activityMinutes} onChange={set('activityMinutes')} unit="min" />
+                        <Num label="Hours of sleep per night" value={d.sleepHours} onChange={set('sleepHours')} unit="hrs" step="0.5" />
                     </div>
+                    <Question label="Tobacco (cigarettes, cigars, chew)">
+                        <Chips options={['Never', 'Former', 'Current']} value={d.tobacco} onChange={set('tobacco')} />
+                        <label className="!mb-0 flex items-center gap-2 text-sm font-normal"><input type="checkbox" checked={d.vaping} onChange={(e) => set('vaping')(e.target.checked)} />I currently vape / use e-cigarettes</label>
+                    </Question>
+                    <Question label="Alcohol" help="1 drink = 12 oz beer, 5 oz wine, or 1.5 oz liquor">
+                        {AUDITC_ITEMS.map((item, i) => (i > 0 && d.auditC[0] === 0) ? null : (
+                            <div key={i}>
+                                <div className="text-sm text-slate-700 mb-1.5">{item.q}</div>
+                                <Chips options={item.options.map((label, v) => ({ key: v, label }))} value={d.auditC[i]}
+                                    onChange={(v) => { const next = [...d.auditC]; next[i] = v === '' ? null : v; setD((p) => ({ ...p, auditC: next })); }} />
+                            </div>
+                        ))}
+                    </Question>
+                    <Question label="In the past year, have you used a recreational drug or a prescription medicine for non-medical reasons?">
+                        <Chips options={[{ key: 'Never', label: 'No' }, { key: 'Past year', label: 'Yes, in the past year' }, { key: 'Current', label: 'Yes, in the past 30 days' }]} value={d.drugUse} onChange={set('drugUse')} />
+                    </Question>
+                </Section>
 
-                </div>
+                <Section id="mental" icon="icon-brain" title="Mood & stress" subtitle="Over the last 2 weeks, how often have you been bothered by the following?" done={sectionDone(SECTIONS[7])}>
+                    <FrequencyGrid items={PHQ9_ITEMS} options={FREQ_OPTIONS} value={d.phq} onChange={set('phq')} highlight={8} />
+                    {phq9Total !== null && <div className="text-sm text-slate-600">Depression (PHQ-9): <b>{phq9Total}</b> – {PHQ9_BANDS(phq9Total)}</div>}
+                    <div className="text-sm font-medium text-slate-800 pt-2">Anxiety – over the last 2 weeks, how often have you been bothered by:</div>
+                    <FrequencyGrid items={GAD7_ITEMS} options={FREQ_OPTIONS} value={d.gad} onChange={set('gad')} />
+                    {gadTotal !== null && <div className="text-sm text-slate-600">Anxiety (GAD-7): <b>{gadTotal}</b> – {GAD7_BANDS(gadTotal)}</div>}
+                </Section>
 
-                {/* Right Column - Social & Screening */}
-                <div className="lg:col-span-1 space-y-8">
-                    
-                    {/* Social Determinants of Health (SDOH) */}
-                    <div className="card">
-                        <div className="section-title">
-                            <div className="icon-home text-[var(--primary)]"></div>
-                            <h3>Social Determinants (SDOH)</h3>
-                        </div>
-                        <div className="space-y-4">
-                            <div>
-                                <label>Housing Instability</label>
-                                <select value={patient.housingInstability} onChange={e => handleChange('housingInstability', e.target.value)}>
-                                    <option>No</option>
-                                    <option>Yes</option>
-                                </select>
+                <Section id="pain" icon="icon-bone" title="Pain" done={sectionDone(SECTIONS[8])}>
+                    <Question label="Do you have pain in your back, joints, or muscles?"><Chips options={YN} value={d.painHas} onChange={set('painHas')} /></Question>
+                    {d.painHas === 'Yes' && (
+                        <>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div><label>Where is the pain?</label><input type="text" value={d.painLocation} onChange={(e) => set('painLocation')(e.target.value)} placeholder="e.g. lower back, right knee" /></div>
+                                <Num label="How many weeks have you had it?" value={d.painWeeks} onChange={set('painWeeks')} unit="weeks" />
                             </div>
-                            <div>
-                                <label>Food Insecurity</label>
-                                <select value={patient.foodInsecurity} onChange={e => handleChange('foodInsecurity', e.target.value)}>
-                                    <option>No</option>
-                                    <option>Yes</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label>Transportation Barrier</label>
-                                <select value={patient.transportationBarrier} onChange={e => handleChange('transportationBarrier', e.target.value)}>
-                                    <option>No</option>
-                                    <option>Yes</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label>Social Support</label>
-                                <select value={patient.socialSupport} onChange={e => handleChange('socialSupport', e.target.value)}>
-                                    <option>Good</option>
-                                    <option>Poor</option>
-                                </select>
-                            </div>
-                        </div>
+                            {PEG_ITEMS.map((q, i) => (
+                                <div key={i}>
+                                    <label className="flex justify-between">{q}<span className="font-bold text-slate-900">{d.peg[i] ?? '–'}</span></label>
+                                    <input type="range" min="0" max="10" value={d.peg[i] ?? 0} className="w-full accent-[var(--primary)]"
+                                        onChange={(e) => { const next = [...d.peg]; next[i] = Number(e.target.value); setD((p) => ({ ...p, peg: next })); }} />
+                                </div>
+                            ))}
+                            <label className="!mb-0 flex items-center gap-2 text-sm font-normal"><input type="checkbox" checked={d.painRestNight} onChange={(e) => set('painRestNight')(e.target.checked)} />Pain is there even at rest or wakes me at night</label>
+                            <Question label="Do any of these apply?">
+                                <CheckList items={PAIN_RED_FLAGS} value={d.painRedFlags} onChange={set('painRedFlags')} tone="red" />
+                            </Question>
+                        </>
+                    )}
+                </Section>
+
+                <Section id="sexual" icon="icon-heart-handshake" title="Sexual health" subtitle="Private and confidential – shared only with your care team. Skip anything you prefer not to answer." done={sectionDone(SECTIONS[9])}>
+                    <Question label="Have you been sexually active in the past 12 months?"><Chips options={['Yes', 'No', 'Prefer not to say']} value={d.sexActive} onChange={set('sexActive')} /></Question>
+                    {d.sexActive === 'Yes' && (
+                        <>
+                            <Question label="Number of partners in the past 12 months">
+                                <Chips options={['1', '2–4', '5+']} value={d.sexPartners} onChange={set('sexPartners')} />
+                                <label className="!mb-0 flex items-center gap-2 text-sm font-normal"><input type="checkbox" checked={d.sexNewPartner} onChange={(e) => set('sexNewPartner')(e.target.checked)} />I have a new partner in the past 3 months</label>
+                            </Question>
+                            <Question label="How often do you use condoms?"><Chips options={['Always', 'Sometimes', 'Never', 'Not applicable']} value={d.sexCondom} onChange={set('sexCondom')} /></Question>
+                            <Question label="Have you had a sexually transmitted infection (STI) in the past 12 months?"><Chips options={YN} value={d.sexSti12mo} onChange={set('sexSti12mo')} /></Question>
+                            <Question label="Pregnancy plans">
+                                <Chips options={['Not applicable', 'Using birth control', 'Trying to get pregnant', 'Not using birth control, do not want pregnancy']} value={d.sexPregnancy} onChange={set('sexPregnancy')} />
+                            </Question>
+                            <label className="!mb-0 flex items-center gap-2 text-sm font-normal"><input type="checkbox" checked={d.sexWantsTesting} onChange={(e) => set('sexWantsTesting')(e.target.checked)} />I would like STI / HIV testing</label>
+                        </>
+                    )}
+                </Section>
+
+                <Section id="social" icon="icon-home" title="Home & resources" subtitle="Your answers help us connect you with support." done={sectionDone(SECTIONS[10])}>
+                    <Question label="What is your living situation today?"><Chips options={['Steady place to live', 'Steady, but worried about losing it', 'No steady place']} value={d.sdohHousing} onChange={set('sdohHousing')} /></Question>
+                    <Question label="In the past 12 months, did you worry your food would run out before you had money to buy more?"><Chips options={['Never', 'Sometimes', 'Often']} value={d.sdohFood} onChange={set('sdohFood')} /></Question>
+                    <Question label="In the past 12 months, has lack of transportation kept you from medical appointments or getting medicine?"><Chips options={YN} value={d.sdohTransport} onChange={set('sdohTransport')} /></Question>
+                    <Question label="In the past 12 months, has the electric, gas, oil, or water company threatened to shut off services?"><Chips options={['No', 'Yes', 'Already shut off']} value={d.sdohUtilities} onChange={set('sdohUtilities')} /></Question>
+                    <Question label="How hard is it to pay for basics like food, housing, medical care, and heating?"><Chips options={['Not hard', 'Somewhat', 'Very hard']} value={d.sdohFinancial} onChange={set('sdohFinancial')} /></Question>
+                    <Question label="How often do you feel lonely or isolated?"><Chips options={['Never', 'Rarely', 'Sometimes', 'Often', 'Always']} value={d.sdohLonely} onChange={set('sdohLonely')} /></Question>
+                    <Question label="Do you feel unsafe at home, or has anyone hurt, threatened, or scared you?" help="If you are in danger now, call 911. National Domestic Violence Hotline: 1-800-799-7233.">
+                        <Chips options={YN} value={d.sdohSafety} onChange={set('sdohSafety')} />
+                    </Question>
+                </Section>
+
+                <Section id="note" icon="icon-message-square" title={isPatient ? 'Message to my care team' : 'Note from patient (optional)'}>
+                    <textarea
+                        rows={4} value={d.patientNote} onChange={(e) => set('patientNote')(e.target.value)}
+                        placeholder={isPatient ? 'Anything you want your nurse, provider, or case manager to know – new symptoms, questions, what you need help with…' : 'Patient-reported concerns'}
+                        className="w-full rounded-md border border-slate-300 shadow-sm px-4 py-2 focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                    />
+                    <label className="!mb-0 flex items-center gap-2 text-sm font-normal"><input type="checkbox" checked={d.wantsCallback} onChange={(e) => set('wantsCallback')(e.target.checked)} />{isPatient ? 'Please call me back' : 'Patient requests a call back'}</label>
+                </Section>
+            </div>
+
+            {/* Sticky save bar */}
+            <div className="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-slate-200 shadow-[0_-4px_12px_rgba(0,0,0,0.04)]">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-4">
+                    <div className="text-sm text-slate-500 flex items-center gap-3 min-w-0">
+                        {!isPatient && <RiskBadge risk={result.tier} />}
+                        <span className="truncate">
+                            {isPatient
+                                ? <>{result.completeness}% complete · Saving sends this to your care team instantly.</>
+                                : <>Score {result.score}/{result.maxScore} · {result.completeness}% complete</>}
+                        </span>
                     </div>
-
-                    {/* Behavioral & Social */}
-                    <div className="card">
-                        <div className="section-title">
-                            <div className="icon-users text-[var(--primary)]"></div>
-                            <h3>Social History & Lifestyle</h3>
-                        </div>
-                        <div className="space-y-4">
-                            <div className="bg-slate-50 p-4 rounded-md border border-slate-100 space-y-4">
-                                <div className="flex items-center gap-2 mb-2 pb-2 border-b border-slate-200">
-                                    <div className="icon-heart-handshake text-[var(--primary)]"></div>
-                                    <h4 className="text-sm font-semibold text-slate-700">Sexual Health Assessment</h4>
-                                </div>
-                                
-                                <div className="grid grid-cols-1 gap-3">
-                                    <div>
-                                        <label className="text-xs">Partners</label>
-                                        <select value={patient.partners} onChange={e => handleChange('partners', e.target.value)} className="text-sm py-1.5">
-                                            <option>Monogamous</option>
-                                            <option>Multiple / New</option>
-                                            <option>Unknown</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="text-xs">Practices</label>
-                                        <select value={patient.practices} onChange={e => handleChange('practices', e.target.value)} className="text-sm py-1.5">
-                                            <option>Safe</option>
-                                            <option>Unsafe</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="text-xs">Protection Usage</label>
-                                        <select value={patient.protectionFromSTIs} onChange={e => handleChange('protectionFromSTIs', e.target.value)} className="text-sm py-1.5">
-                                            <option>Consistent</option>
-                                            <option>Inconsistent</option>
-                                            <option>None</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="text-xs">History of STIs?</label>
-                                        <select value={patient.pastSTIs} onChange={e => handleChange('pastSTIs', e.target.value)} className="text-sm py-1.5">
-                                            <option>No</option>
-                                            <option>Yes</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="text-xs">Pregnancy Intention</label>
-                                        <select value={patient.pregnancyIntention} onChange={e => handleChange('pregnancyIntention', e.target.value)} className="text-sm py-1.5">
-                                            <option>Using Contraception</option>
-                                            <option>Trying / Not Using Contraception</option>
-                                            <option>Not Active</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div>
-                                <label>Tobacco Use</label>
-                                <select value={patient.tobaccoUse} onChange={e => handleChange('tobaccoUse', e.target.value)}>
-                                    <option>No</option>
-                                    <option>Yes</option>
-                                </select>
-                            </div>
-                            {patient.tobaccoUse === 'Yes' && (
-                                <div className="pl-4 border-l-2 border-[var(--primary)]">
-                                    <label>Tobacco Counseled?</label>
-                                    <select value={patient.tobaccoCounseled} onChange={e => handleChange('tobaccoCounseled', e.target.value)}>
-                                        <option>No</option>
-                                        <option>Yes</option>
-                                    </select>
-                                </div>
-                            )}
-                            <div>
-                                <label>Alcohol Use</label>
-                                <select value={patient.alcoholUse} onChange={e => handleChange('alcoholUse', e.target.value)}>
-                                    <option>None</option>
-                                    <option>Moderate</option>
-                                    <option>Heavy</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label>Substance Use</label>
-                                <select value={patient.substanceUse} onChange={e => handleChange('substanceUse', e.target.value)}>
-                                    <option>None</option>
-                                    <option>History</option>
-                                    <option>Active</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Screening Tools */}
-                    <div className="card">
-                        <div className="section-title">
-                            <div className="icon-clipboard-list text-[var(--primary)]"></div>
-                            <h3>Screening Tools</h3>
-                        </div>
-                        <div className="space-y-4">
-                            <div className="p-4 bg-slate-50 border border-slate-100 rounded-lg">
-                                <label className="flex justify-between items-center mb-2">
-                                    <span className="font-semibold text-slate-800">PHQ-9 Depression</span>
-                                    <span className="text-slate-400 font-normal text-xs">(0-27)</span>
-                                </label>
-                                <input 
-                                    type="number" min="0" max="27" 
-                                    value={patient.phq9} 
-                                    onChange={e => handleChange('phq9', Number(e.target.value))} 
-                                    className="mb-2"
-                                />
-                                <div className="flex justify-between items-center text-xs">
-                                    <span className="text-slate-500">Severity:</span>
-                                    <span className={`font-bold ${phq9Status.color}`}>{phq9Status.label}</span>
-                                </div>
-                                
-                                <div className="mt-3 pt-3 border-t border-slate-200">
-                                    <label className="flex items-center gap-2 cursor-pointer">
-                                        <input 
-                                            type="checkbox" 
-                                            checked={patient.phq9_item9 > 0} 
-                                            onChange={e => handleChange('phq9_item9', e.target.checked ? 1 : 0)}
-                                            className="text-red-600 focus:ring-red-500 rounded"
-                                        />
-                                        <span className="text-sm font-medium text-red-800">Item 9 (Suicidal Thoughts) Positive?</span>
-                                    </label>
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="flex justify-between">
-                                    PHQ-2 Score (Pre-screen)
-                                    <span className="text-slate-400 font-normal text-xs">(0-6)</span>
-                                </label>
-                                <input 
-                                    type="number" min="0" max="6" 
-                                    value={patient.phq2} 
-                                    onChange={e => handleChange('phq2', Number(e.target.value))} 
-                                />
-                            </div>
-
-                            <div>
-                                <label className="flex justify-between">
-                                    GAD-7 (Anxiety)
-                                    <span className="text-slate-400 font-normal text-xs">(0-21)</span>
-                                </label>
-                                <input 
-                                    type="number" min="0" max="21" 
-                                    value={patient.gad7} 
-                                    onChange={e => handleChange('gad7', Number(e.target.value))} 
-                                />
-                            </div>
-                            
-                            <div>
-                                <label className="flex justify-between">
-                                    AUDIT-C (Alcohol)
-                                    <span className="text-slate-400 font-normal text-xs">(0-12)</span>
-                                </label>
-                                <input 
-                                    type="number" min="0" max="12" 
-                                    value={patient.auditC} 
-                                    onChange={e => handleChange('auditC', Number(e.target.value))} 
-                                />
-                            </div>
-                            
-                            <div>
-                                <label className="flex justify-between">
-                                    PEG Score (Pain)
-                                    <span className="text-slate-400 font-normal text-xs">(0-10)</span>
-                                </label>
-                                <input 
-                                    type="number" min="0" max="10" 
-                                    value={patient.pegScore} 
-                                    onChange={e => handleChange('pegScore', Number(e.target.value))} 
-                                />
-                            </div>
-                            
-                            <div>
-                                <label>BH Assessment</label>
-                                <select value={patient.bhAssessment} onChange={e => handleChange('bhAssessment', e.target.value)}>
-                                    <option>Not Done</option>
-                                    <option>Normal</option>
-                                    <option>Needs Follow-up</option>
-                                    <option>High Risk</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-
+                    <button onClick={() => onSave(d)} disabled={saving} className="btn-primary !px-5 !py-2.5 shrink-0">
+                        <div className="icon-send"></div>{saving ? 'Saving…' : isPatient ? 'Send to care team' : 'Save assessment'}
+                    </button>
                 </div>
             </div>
         </div>
