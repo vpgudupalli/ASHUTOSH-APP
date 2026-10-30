@@ -1,0 +1,31 @@
+# One-click deploy on Render: Dashboard -> New -> Blueprint -> pick this repo.
+services:
+  - type: web
+    name: risk-navigator
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: risk-navigator-db
+          property: connectionString
+      - key: ALLOW_PATIENT_SIGNUP
+        value: "true"
+      # Render asks for these on first deploy; they create the first admin login.
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+
+databases:
+  - name: risk-navigator-db
+    plan: free
+    databaseName: risk_navigator
+    user: risk_navigator
