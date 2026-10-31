@@ -156,6 +156,10 @@ export async function migrate() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
     CREATE INDEX IF NOT EXISTS audit_log_created_idx ON audit_log (created_at DESC);
+
+    -- Patients can only create an account with a one-time invite code from their care team.
+    ALTER TABLE patients ADD COLUMN IF NOT EXISTS invite_hash TEXT;
+    ALTER TABLE patients ADD COLUMN IF NOT EXISTS invite_expires_at TIMESTAMPTZ;
   `);
 }
 

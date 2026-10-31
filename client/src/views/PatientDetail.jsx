@@ -13,7 +13,8 @@ export default function PatientDetail({ id, user, push, tab: initialTab }) {
     const isPatient = user.role === 'patient';
     const [state, setState] = React.useState(null);
     const [error, setError] = React.useState('');
-    const [tab, setTab] = React.useState(initialTab || (isPatient ? 'checkin' : 'overview'));
+    const [tab, setTab] = React.useState(initialTab && initialTab !== 'invite' ? initialTab : (isPatient ? 'checkin' : 'overview'));
+    const [inviting, setInviting] = React.useState(initialTab === 'invite' && !isPatient);
     const [saving, setSaving] = React.useState(false);
     const [formKey, setFormKey] = React.useState(0); // bump to reset form to latest saved data
     const [incoming, setIncoming] = React.useState(null);
@@ -98,11 +99,13 @@ export default function PatientDetail({ id, user, push, tab: initialTab }) {
                         <p className="text-sm text-slate-500">
                             {!isPatient && <>{patient.dob ? `DOB ${patient.dob}` : 'DOB —'}{patient.mrn ? ` · MRN ${patient.mrn}` : ''}{patient.phone ? ` · ${patient.phone}` : ''} · </>}
                             {latest ? `Last check-in ${timeAgo(latest.created_at)}` : 'No check-in yet'}
+                            {!isPatient && <> · {patient.login_email ? <span className="text-green-700">App access: {patient.login_email}</span> : patient.invite_pending ? <span className="text-amber-700">Invite sent, not joined yet</span> : <span className="text-slate-400">No app access yet</span>}</>}
                             {patient.staff.length > 0 && <> · Care team: {patient.staff.map((s) => `${s.name} (${ROLE_LABELS[s.role]})`).join(', ')}</>}
                         </p>
                     </div>
                 </div>
                 <div className="flex gap-2 shrink-0">
+                    {!isPatient && !patient.login_email && <button className="btn-primary" onClick={() => setInviting(true)}><span className="icon-send"></span>{patient.invite_pending ? 'New invite code' : 'Invite to app'}</button>}
                     {!isPatient && <button className="btn-ghost" onClick={() => setEditing(true)}><span className="icon-pencil"></span>Edit details</button>}
                     {latest && <button className="btn-ghost" onClick={() => navigate(`/patients/${id}/print`)}><span className="icon-printer"></span>Print / PDF</button>}
                 </div>
@@ -145,6 +148,7 @@ export default function PatientDetail({ id, user, push, tab: initialTab }) {
             )}
             {tab === 'history' && <History assessments={assessments} isPatient={isPatient} patientId={id} />}
 
+            {inviting && <InvitePatient patient={patient} onClose={() => { setInviting(false); load(); }} push={push} />}
             {editing && <EditPatient patient={patient} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); load(); push({ title: 'Details updated' }); }} push={push} />}
         </div>
     );
@@ -282,6 +286,46 @@ function EditPatient({ patient, onClose, onSaved, push }) {
                 </div>
                 <div className="flex justify-end gap-2"><button type="button" className="btn-ghost" onClick={onClose}>Cancel</button><button className="btn-primary">Save</button></div>
             </form>
+        </Modal>
+    );
+}
+
+// Staff create a one-time invite code; the patient uses it to create an account with any email.
+function InvitePatient({ patient, onClose, push }) {
+    const [invite, setInvite] = React.useState(null);
+    const [error, setError] = React.useState('');
+    React.useEffect(() => {
+        api(`/patients/${patient.id}/invite`, { method: 'POST' }).then(setInvite).catch((e) => setError(e.message));
+    }, [patient.id]);
+    const link = invite ? `${window.location.origin}/#/join/${invite.code}` : '';
+    const message = invite
+        ? `Hi ${patient.name.split(' ')[0]}, your care team at Ashutosh Services invites you to Risk Navigator to check in on your health and message us. Open ${link} and enter your date of birth to create your account (code ${invite.code}, valid until ${new Date(invite.expiresAt).toLocaleDateString()}).`
+        : '';
+    const copy = (text, what) => { navigator.clipboard?.writeText(text); push({ title: `${what} copied` }); };
+    return (
+        <Modal title={`Invite ${patient.name} to the app`} onClose={onClose}>
+            {error && <div className="text-sm text-red-700 bg-red-50 rounded-md px-3 py-2">{error}</div>}
+            {!invite && !error && <div className="text-slate-400 text-sm">Creating invite…</div>}
+            {invite && (
+                <div className="space-y-4 text-sm">
+                    <p className="text-slate-600">Give this code to the patient by text, email, phone, or in person. They'll create their account with <b>their own email</b> and must also enter their date of birth{patient.dob ? '' : ' (add a DOB on Edit details for extra security)'}.</p>
+                    <div className="text-center bg-sky-50 border border-sky-200 rounded-lg py-4">
+                        <div className="text-xs text-slate-500">Invite code</div>
+                        <div className="text-3xl font-bold tracking-widest text-slate-900 font-mono">{invite.code}</div>
+                        <div className="text-xs text-slate-500 mt-1">Valid until {new Date(invite.expiresAt).toLocaleDateString()} · works once</div>
+                    </div>
+                    <div>
+                        <label>Sign-up link</label>
+                        <div className="flex gap-2"><input type="text" readOnly value={link} className="text-xs" /><button className="btn-ghost" onClick={() => copy(link, 'Link')}>Copy</button></div>
+                    </div>
+                    <div>
+                        <label>Ready-to-send message</label>
+                        <textarea readOnly rows={4} value={message} className="w-full rounded-md border border-slate-300 px-3 py-2 text-xs" />
+                        <button className="btn-primary mt-2" onClick={() => copy(message, 'Message')}><span className="icon-copy"></span>Copy message</button>
+                    </div>
+                    <p className="text-xs text-slate-400">Creating a new code cancels any earlier one. Codes are stored securely and can't be viewed again.</p>
+                </div>
+            )}
         </Modal>
     );
 }

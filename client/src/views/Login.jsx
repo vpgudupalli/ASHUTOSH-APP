@@ -1,18 +1,12 @@
 import React from 'react';
 import { api } from '../api.js';
 
-export default function Login({ onSignedIn, notice }) {
-    const [mode, setMode] = React.useState('login'); // login | register | mfa
-    const [form, setForm] = React.useState({ name: '', email: '', password: '', dob: '', phone: '', privacyAck: false });
+export default function Login({ onSignedIn, notice, inviteCode }) {
+    const [mode, setMode] = React.useState(inviteCode ? 'register' : 'login'); // login | register | mfa
+    const [form, setForm] = React.useState({ inviteCode: inviteCode || '', email: '', password: '', dob: '', phone: '', privacyAck: false });
     const [mfa, setMfa] = React.useState({ token: '', code: '' });
     const [error, setError] = React.useState('');
     const [busy, setBusy] = React.useState(false);
-    const [allowSignup, setAllowSignup] = React.useState(false);
-
-    React.useEffect(() => {
-        api('/config').then((c) => setAllowSignup(c.allowPatientSignup)).catch(() => {});
-    }, []);
-
     const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }));
 
     const submit = async (e) => {
@@ -36,7 +30,7 @@ export default function Login({ onSignedIn, notice }) {
         }
     };
 
-    const titles = { login: 'Sign in', register: 'Create your patient account', mfa: 'Two-step verification' };
+    const titles = { login: 'Sign in', register: 'Join with your invite code', mfa: 'Two-step verification' };
 
     return (
         <div className="max-w-md mx-auto py-6">
@@ -47,7 +41,7 @@ export default function Login({ onSignedIn, notice }) {
                     <h2 className="text-2xl">{titles[mode]}</h2>
                     <p className="text-sm text-slate-500 mt-1">
                         {mode === 'login' && 'Patients, providers, NPs and case managers sign in here.'}
-                        {mode === 'register' && 'Check in on your health anytime and message your care team securely.'}
+                        {mode === 'register' && 'Your care team gave you an invite code. Use it to create your account with any email you like.'}
                         {mode === 'mfa' && 'Enter the 6-digit code from your authenticator app.'}
                     </p>
                 </div>
@@ -60,10 +54,10 @@ export default function Login({ onSignedIn, notice }) {
                         <>
                             {mode === 'register' && (
                                 <>
-                                    <div><label>Full name</label><input type="text" value={form.name} onChange={set('name')} required autoComplete="name" /></div>
+                                    <div><label>Invite code</label><input type="text" value={form.inviteCode} onChange={set('inviteCode')} required placeholder="e.g. K7M2-QX9P" autoComplete="off" className="uppercase tracking-widest" /></div>
                                     <div className="grid grid-cols-2 gap-3">
-                                        <div><label>Date of birth</label><input type="date" value={form.dob} onChange={set('dob')} /></div>
-                                        <div><label>Phone</label><input type="text" inputMode="tel" value={form.phone} onChange={set('phone')} autoComplete="tel" /></div>
+                                        <div><label>Date of birth</label><input type="date" value={form.dob} onChange={set('dob')} required /></div>
+                                        <div><label>Phone (optional)</label><input type="text" inputMode="tel" value={form.phone} onChange={set('phone')} autoComplete="tel" /></div>
                                     </div>
                                 </>
                             )}
@@ -92,16 +86,16 @@ export default function Login({ onSignedIn, notice }) {
                 </form>
 
                 {mode === 'mfa' && <button className="text-sm text-slate-500 mt-4 w-full" onClick={() => { setMode('login'); setError(''); }}>Back</button>}
-                {allowSignup && mode !== 'mfa' && (
+                {mode !== 'mfa' && (
                     <div className="text-center text-sm text-slate-500 mt-6 pt-4 border-t border-slate-100">
                         {mode === 'login' ? (
-                            <>New patient? <button className="text-[var(--primary-dark)] font-medium" onClick={() => { setMode('register'); setError(''); }}>Create an account</button></>
+                            <>New patient with an invite code? <button className="text-[var(--primary-dark)] font-medium" onClick={() => { setMode('register'); setError(''); }}>Create your account</button></>
                         ) : (
                             <>Already have an account? <button className="text-[var(--primary-dark)] font-medium" onClick={() => { setMode('login'); setError(''); }}>Sign in</button></>
                         )}
                     </div>
                 )}
-                <p className="text-xs text-slate-400 text-center mt-4">Staff accounts are created by your administrator.</p>
+                <p className="text-xs text-slate-400 text-center mt-4">No invite code? Ask your nurse, provider or case manager. Staff accounts are created by your administrator.</p>
             </div>
         </div>
     );

@@ -111,6 +111,7 @@ export default function Dashboard({ user, push }) {
                                             {p.staff.length ? p.staff.map((s) => s.name).join(', ') : 'No care team'}
                                             {p.last_contact_at && <> · Last contact {timeAgo(p.last_contact_at)}</>}
                                             {p.attempts_on_latest > 0 && <> · {p.attempts_on_latest} attempt{p.attempts_on_latest > 1 ? 's' : ''}</>}
+                                            {!p.login_email && <> · {p.invite_pending ? 'Invited' : 'No app access'}</>}
                                         </div>
                                     </div>
                                     <div className="flex flex-wrap items-center gap-2 md:justify-end">
@@ -129,7 +130,7 @@ export default function Dashboard({ user, push }) {
                 )}
             </div>
 
-            {showAdd && <AddPatient onClose={() => setShowAdd(false)} onCreated={(id) => { setShowAdd(false); push({ title: 'Patient added' }); navigate(`/patients/${id}`); }} />}
+            {showAdd && <AddPatient onClose={() => setShowAdd(false)} onCreated={(id) => { setShowAdd(false); push({ title: 'Patient added' }); navigate(`/patients/${id}/invite`); }} />}
         </div>
     );
 }

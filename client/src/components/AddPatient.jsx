@@ -2,7 +2,7 @@ import React from 'react';
 import { api } from '../api.js';
 
 export default function AddPatient({ onClose, onCreated }) {
-    const [form, setForm] = React.useState({ name: '', dob: '', mrn: '', phone: '', email: '', password: '' });
+    const [form, setForm] = React.useState({ name: '', dob: '', mrn: '', phone: '' });
     const [error, setError] = React.useState('');
     const [busy, setBusy] = React.useState(false);
     const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -35,19 +35,7 @@ export default function AddPatient({ onClose, onCreated }) {
                     <div><label>MRN (EMR)</label><input type="text" value={form.mrn} onChange={set('mrn')} /></div>
                     <div><label>Phone</label><input type="text" value={form.phone} onChange={set('phone')} /></div>
                 </div>
-                <div className="bg-slate-50 border border-slate-100 rounded-lg p-3 space-y-3">
-                    <p className="text-xs text-slate-500">Optional: give the patient a login so they can enter their own data.</p>
-                    <div>
-                        <label>Patient email</label>
-                        <input type="email" value={form.email} onChange={set('email')} />
-                    </div>
-                    {form.email && (
-                        <div>
-                            <label>Temporary password</label>
-                            <input type="text" value={form.password} onChange={set('password')} minLength={10} required />
-                        </div>
-                    )}
-                </div>
+                <p className="text-xs text-slate-500">Next you can create an invite code so the patient can join the app with their own email.</p>
                 {error && <div className="text-sm text-red-700 bg-red-50 rounded-md px-3 py-2">{error}</div>}
                 <div className="flex justify-end gap-2">
                     <button type="button" className="btn-ghost" onClick={onClose}>Cancel</button>

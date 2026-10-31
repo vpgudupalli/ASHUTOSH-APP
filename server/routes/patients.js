@@ -1,8 +1,10 @@
+import crypto from 'node:crypto';
 import express from 'express';
 import { query, one, audit } from '../db.js';
 import { hashPassword, passwordProblem, requireAuth, requireStaff, isStaff, canAccessPatient } from '../auth.js';
 import { notifyPatient, notifyCareTeam } from '../realtime.js';
 import { h, clean, validEmail, validDate, ipOf } from '../util.js';
+import { sha256 } from '../crypto.js';
 import { scoreAssessment, TIER_INFO, TIERS } from '../../shared/risk.js';
 
 const router = express.Router();
@@ -30,6 +32,7 @@ const PATIENT_SQL = `
          p.latest_risk, p.latest_score, p.latest_assessment_id, p.latest_assessment_at,
          p.last_reviewed_at, rv.name AS last_reviewed_by_name, p.created_at,
          u.email AS login_email,
+         (p.invite_hash IS NOT NULL AND p.invite_expires_at > now()) AS invite_pending, p.invite_expires_at,
          COALESCE((SELECT json_agg(json_build_object('id', s.id, 'name', s.name, 'role', s.role) ORDER BY s.name)
                      FROM assignments a JOIN users s ON s.id = a.staff_id WHERE a.patient_id = p.id), '[]'::json) AS staff,
          (SELECT count(*)::int FROM messages m
@@ -148,6 +151,35 @@ router.patch('/patients/:id', requireStaff, access, h(async (req, res) => {
   vals.push(id);
   await query(`UPDATE patients SET ${sets.join(', ')} WHERE id = $${vals.length}`, vals);
   audit(req.user.id, 'patient_update', id, Object.keys(b).join(','), ipOf(req));
+  notifyCareTeam(id, 'patients:changed', { patientId: id });
+  res.json({ ok: true });
+}));
+
+// ---------- app access: invite codes ----------
+
+const INVITE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I to avoid mix-ups
+const INVITE_DAYS = 14;
+
+// Creates a new one-time invite code (replacing any earlier one). Only its hash is stored.
+router.post('/patients/:id/invite', requireStaff, access, h(async (req, res) => {
+  const id = pid(req);
+  const p = await one('SELECT user_id FROM patients WHERE id = $1', [id]);
+  if (p.user_id) return res.status(400).json({ error: 'This patient already has an app account' });
+  let raw = '';
+  for (let i = 0; i < 8; i++) raw += INVITE_ALPHABET[crypto.randomInt(INVITE_ALPHABET.length)];
+  const row = await one(
+    `UPDATE patients SET invite_hash = $1, invite_expires_at = now() + make_interval(days => $2) WHERE id = $3 RETURNING invite_expires_at`,
+    [sha256(raw), INVITE_DAYS, id]
+  );
+  audit(req.user.id, 'invite_create', id, null, ipOf(req));
+  notifyCareTeam(id, 'patients:changed', { patientId: id });
+  res.json({ code: `${raw.slice(0, 4)}-${raw.slice(4)}`, expiresAt: row.invite_expires_at });
+}));
+
+router.delete('/patients/:id/invite', requireStaff, access, h(async (req, res) => {
+  const id = pid(req);
+  await query('UPDATE patients SET invite_hash = NULL, invite_expires_at = NULL WHERE id = $1', [id]);
+  audit(req.user.id, 'invite_revoke', id, null, ipOf(req));
   notifyCareTeam(id, 'patients:changed', { patientId: id });
   res.json({ ok: true });
 }));

@@ -114,7 +114,7 @@ export default function App() {
   const parts = route.split('/').filter(Boolean); // e.g. ['patients','12','print','34']
   let page;
   if (!user) {
-    page = <Login notice={notice} onSignedIn={() => api('/auth/me').then((d) => { setNotice(''); navigate('/'); setUser(d.user); })} />;
+    page = <Login key={route} notice={notice} inviteCode={parts[0] === 'join' ? decodeURIComponent(parts[1] || '') : ''} onSignedIn={() => api('/auth/me').then((d) => { setNotice(''); navigate('/'); setUser(d.user); })} />;
   } else if (user.mfaSetupRequired || parts[0] === 'account') {
     page = <Account user={user} push={push} onChanged={refreshMe} />;
   } else if (parts[0] === 'methodology') {

@@ -22,8 +22,6 @@ services:
         fromDatabase:
           name: risk-navigator-db
           property: connectionString
-      - key: ALLOW_PATIENT_SIGNUP
-        value: "true"
       # Render asks for these on first deploy; they create the first admin login.
       - key: ADMIN_EMAIL
         sync: false

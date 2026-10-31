@@ -6,27 +6,45 @@ import {
   hashPassword, checkPassword, passwordProblem, setSession, clearSession, requireAuth,
   signMfaToken, readMfaToken, IDLE_MINUTES, REQUIRE_STAFF_MFA, MAX_FAILED_LOGINS, LOCK_MINUTES,
 } from '../auth.js';
-import { generateTotpSecret, verifyTotp, otpauthUrl, encrypt, decrypt } from '../crypto.js';
+import { generateTotpSecret, verifyTotp, otpauthUrl, encrypt, decrypt, sha256 } from '../crypto.js';
 import { notifyPatient } from '../realtime.js';
 import { h, clean, validEmail, validDate, ipOf, publicUser } from '../util.js';
 
 const router = express.Router();
-export const ALLOW_PATIENT_SIGNUP = process.env.ALLOW_PATIENT_SIGNUP !== 'false';
 
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 30, standardHeaders: true, legacyHeaders: false });
 
 router.get('/config', (req, res) => res.json({
-  allowPatientSignup: ALLOW_PATIENT_SIGNUP,
+  inviteOnly: true,
   idleMinutes: IDLE_MINUTES,
   requireStaffMfa: REQUIRE_STAFF_MFA,
 }));
 
+// Invite codes are shown to staff as e.g. "K7M2-QX9P"; compare ignoring dashes/spaces/case.
+export const normalizeInvite = (code) => String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+// Patients join only with a one-time invite code from their care team, and may use any email.
 router.post('/auth/register', authLimiter, h(async (req, res) => {
-  if (!ALLOW_PATIENT_SIGNUP) return res.status(403).json({ error: 'Self sign-up is disabled' });
-  const name = clean(req.body.name);
+  const code = normalizeInvite(req.body.inviteCode);
   const email = clean(req.body.email).toLowerCase();
   const password = String(req.body.password || '');
-  if (!name || !validEmail(email)) return res.status(400).json({ error: 'Name and a valid email are required' });
+  if (!code) return res.status(400).json({ error: 'Enter the invite code from your care team' });
+  const patient = await one(
+    `SELECT id, name, to_char(dob, 'YYYY-MM-DD') AS dob FROM patients
+      WHERE invite_hash = $1 AND user_id IS NULL AND invite_expires_at > now()`,
+    [sha256(code)]
+  );
+  // Same message for a wrong code or wrong date of birth so neither can be guessed separately.
+  const badInvite = () => res.status(400).json({ error: 'That invite code and date of birth do not match our records, or the code has expired. Ask your care team for a new code.' });
+  if (!patient) {
+    audit(null, 'invite_failed', null, 'unknown or expired code', ipOf(req));
+    return badInvite();
+  }
+  if (patient.dob && patient.dob !== validDate(req.body.dob)) {
+    audit(null, 'invite_failed', patient.id, 'date of birth mismatch', ipOf(req));
+    return badInvite();
+  }
+  if (!validEmail(email)) return res.status(400).json({ error: 'Enter a valid email address' });
   const problem = passwordProblem(password);
   if (problem) return res.status(400).json({ error: problem });
   if (!req.body.privacyAck) return res.status(400).json({ error: 'Please acknowledge the privacy notice to continue' });
@@ -35,14 +53,15 @@ router.post('/auth/register', authLimiter, h(async (req, res) => {
   }
   const user = await one(
     `INSERT INTO users (email, password_hash, name, role, last_login_at) VALUES ($1, $2, $3, 'patient', now()) RETURNING *`,
-    [email, await hashPassword(password), name]
+    [email, await hashPassword(password), patient.name]
   );
-  const patient = await one(
-    `INSERT INTO patients (user_id, name, dob, phone, privacy_ack_at, created_by) VALUES ($1, $2, $3, $4, now(), $1) RETURNING id`,
-    [user.id, name, validDate(req.body.dob), clean(req.body.phone, 30) || null]
+  await query(
+    `UPDATE patients SET user_id = $1, invite_hash = NULL, invite_expires_at = NULL, privacy_ack_at = now(),
+            dob = COALESCE(dob, $2), phone = COALESCE(NULLIF($3, ''), phone) WHERE id = $4`,
+    [user.id, validDate(req.body.dob), clean(req.body.phone, 30), patient.id]
   );
-  audit(user.id, 'patient_self_register', patient.id, null, ipOf(req));
-  notifyPatient(patient.id, 'patients:changed', {});
+  audit(user.id, 'patient_invite_accepted', patient.id, null, ipOf(req));
+  notifyPatient(patient.id, 'patients:changed', { patientId: patient.id });
   setSession(res, user);
   res.json({ user: publicUser(user) });
 }));
