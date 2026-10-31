@@ -5,6 +5,7 @@ import tailwindcss from '@tailwindcss/vite';
 const API = 'http://localhost:3000';
 
 export default defineConfig({
+  base: '/app/', // the public website lives at /, the app at /app
   plugins: [react(), tailwindcss()],
   server: {
     port: 5173,

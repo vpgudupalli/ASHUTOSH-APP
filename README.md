@@ -4,6 +4,18 @@ Patients check in on their health anytime, from any device. Their care team (pro
 practitioners, case managers) sees each check-in live, scored and prioritized, and works it until
 the loop is closed. Goal: active follow-up, fewer avoidable ED visits, lower total cost of care.
 
+## Site map
+
+| Path | What |
+|---|---|
+| `/` `/services` `/about` `/contact` | Ashutosh Services company website (`site/*.html`, plain HTML + `site/styles.css`) |
+| `/risk-navigator` | Product landing page |
+| `/app/` | The application (sign in, check-ins, care team, admin) |
+
+Contact/demo form submissions appear in the app under **Admin → Website inquiries**.
+Highlighted yellow text on the website (e.g. `[phone number]`, team bios) are placeholders to replace.
+Patients join only with a one-time **invite code** created by staff on the patient's record.
+
 ## What's in it
 
 **Patient side**

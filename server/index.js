@@ -12,10 +12,12 @@ import authRoutes from './routes/auth.js';
 import patientRoutes from './routes/patients.js';
 import adminRoutes from './routes/admin.js';
 import fhirRoutes from './fhir.js';
+import siteRoutes from './routes/site.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 3000;
 const DIST = path.join(__dirname, '..', 'client', 'dist');
+const SITE = path.join(__dirname, '..', 'site');
 
 await migrate();
 
@@ -52,17 +54,24 @@ app.get('/healthz', (req, res) => res.json({ ok: true }));
 const noStore = (req, res, next) => { res.set('Cache-Control', 'no-store'); res.set('Pragma', 'no-cache'); next(); };
 app.use('/fhir', noStore, fhirRoutes);
 app.use('/api', noStore);
+app.use('/api', siteRoutes); // public: website contact form
 app.use('/api', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api', patientRoutes);
 app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }));
 
+// The app (sign in, patient check-ins, care team) is served under /app.
 if (fs.existsSync(DIST)) {
-  app.use(express.static(DIST, { index: false, maxAge: '1h' }));
-  app.get('*', (req, res) => res.sendFile(path.join(DIST, 'index.html')));
+  app.use('/app', express.static(DIST, { index: false, maxAge: '1h' }));
+  app.get(['/app', '/app/*'], (req, res) => res.sendFile(path.join(DIST, 'index.html')));
 } else {
-  app.get('/', (req, res) => res.send('API running. Build the client with "npm run build", or use "npm run dev:client".'));
+  app.get('/app', (req, res) => res.send('App not built. Run "npm run build", or use "npm run dev:client".'));
 }
+app.get(['/login', '/signin'], (req, res) => res.redirect('/app/'));
+
+// Public website (company pages + Risk Navigator landing page) at the root.
+app.use(express.static(SITE, { extensions: ['html'], maxAge: '1h' }));
+app.use((req, res) => res.status(404).sendFile(path.join(SITE, '404.html')));
 
 app.use((err, req, res, next) => {
   console.error(err);

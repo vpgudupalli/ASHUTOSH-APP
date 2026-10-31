@@ -160,6 +160,22 @@ export async function migrate() {
     -- Patients can only create an account with a one-time invite code from their care team.
     ALTER TABLE patients ADD COLUMN IF NOT EXISTS invite_hash TEXT;
     ALTER TABLE patients ADD COLUMN IF NOT EXISTS invite_expires_at TIMESTAMPTZ;
+
+    -- Demo / contact requests from the public website.
+    CREATE TABLE IF NOT EXISTS inquiries (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL,
+      phone TEXT,
+      organization TEXT,
+      role TEXT,
+      topic TEXT,
+      message TEXT,
+      source_page TEXT,
+      handled_at TIMESTAMPTZ,
+      handled_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
   `);
 }
 

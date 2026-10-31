@@ -112,6 +112,25 @@ router.delete('/api-keys/:id', h(async (req, res) => {
   res.json({ ok: true });
 }));
 
+// ---------- website inquiries ----------
+
+router.get('/inquiries', h(async (req, res) => {
+  const inquiries = await query(
+    `SELECT i.*, u.name AS handled_by_name FROM inquiries i LEFT JOIN users u ON u.id = i.handled_by
+      ORDER BY (i.handled_at IS NULL) DESC, i.created_at DESC LIMIT 500`
+  );
+  res.json({ inquiries });
+}));
+
+router.patch('/inquiries/:id', h(async (req, res) => {
+  const handled = !!req.body.handled;
+  await query(
+    'UPDATE inquiries SET handled_at = CASE WHEN $1 THEN now() ELSE NULL END, handled_by = CASE WHEN $1 THEN $2::int ELSE NULL END WHERE id = $3',
+    [handled, req.user.id, Number(req.params.id)]
+  );
+  res.json({ ok: true });
+}));
+
 // ---------- audit log ----------
 
 router.get('/audit', h(async (req, res) => {

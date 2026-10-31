@@ -297,7 +297,7 @@ function InvitePatient({ patient, onClose, push }) {
     React.useEffect(() => {
         api(`/patients/${patient.id}/invite`, { method: 'POST' }).then(setInvite).catch((e) => setError(e.message));
     }, [patient.id]);
-    const link = invite ? `${window.location.origin}/#/join/${invite.code}` : '';
+    const link = invite ? `${window.location.origin}/app/#/join/${invite.code}` : '';
     const message = invite
         ? `Hi ${patient.name.split(' ')[0]}, your care team at Ashutosh Services invites you to Risk Navigator to check in on your health and message us. Open ${link} and enter your date of birth to create your account (code ${invite.code}, valid until ${new Date(invite.expiresAt).toLocaleDateString()}).`
         : '';

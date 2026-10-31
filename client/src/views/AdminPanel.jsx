@@ -15,7 +15,7 @@ export default function AdminPanel({ push }) {
                 <p className="text-sm text-slate-500">Staff accounts, care team assignments, EMR integration, and the HIPAA audit trail.</p>
             </div>
             <div className="flex gap-1 border-b border-slate-200 overflow-x-auto">
-                {[['assign', 'Care team assignments'], ['users', 'Users'], ['emr', 'EMR integration'], ['audit', 'Audit log']].map(([k, label]) => (
+                {[['assign', 'Care team assignments'], ['users', 'Users'], ['inquiries', 'Website inquiries'], ['emr', 'EMR integration'], ['audit', 'Audit log']].map(([k, label]) => (
                     <button
                         key={k}
                         onClick={() => setTab(k)}
@@ -27,6 +27,7 @@ export default function AdminPanel({ push }) {
             </div>
             {tab === 'assign' && <Assignments push={push} />}
             {tab === 'users' && <Users push={push} />}
+            {tab === 'inquiries' && <Inquiries push={push} />}
             {tab === 'emr' && <EmrKeys push={push} />}
             {tab === 'audit' && <AuditLog push={push} />}
         </div>
@@ -340,5 +341,45 @@ function ResetPassword({ user, onClose, onSave }) {
                 </div>
             </form>
         </Modal>
+    );
+}
+
+function Inquiries({ push }) {
+    const [items, setItems] = React.useState(null);
+    const load = React.useCallback(() => {
+        api('/admin/inquiries').then((d) => setItems(d.inquiries)).catch((e) => push({ error: true, title: e.message }));
+    }, [push]);
+    React.useEffect(load, [load]);
+    useSocketEvents(['inquiry:new'], load);
+    const mark = async (id, handled) => {
+        await api(`/admin/inquiries/${id}`, { method: 'PATCH', body: { handled } }).catch((e) => push({ error: true, title: e.message }));
+        load();
+    };
+    if (!items) return <div className="text-slate-400">Loading…</div>;
+    return (
+        <div className="space-y-3">
+            <p className="text-sm text-slate-600">Demo and contact requests submitted on your public website. New ones appear here live.</p>
+            {items.length === 0 && <div className="card text-center text-slate-400">No inquiries yet.</div>}
+            {items.map((i) => (
+                <div key={i.id} className={`card !p-4 ${i.handled_at ? 'opacity-60' : '!border-l-4 !border-l-sky-500'}`}>
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
+                        <div>
+                            <div className="font-semibold text-slate-900">{i.name}{i.organization ? <span className="font-normal text-slate-500"> · {i.organization}</span> : ''}{i.role ? <span className="font-normal text-slate-500"> · {i.role}</span> : ''}</div>
+                            <div className="text-sm text-slate-600"><a className="text-[var(--primary-dark)]" href={`mailto:${i.email}`}>{i.email}</a>{i.phone ? ` · ${i.phone}` : ''}</div>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs">
+                            <span className="px-2 py-0.5 rounded-full bg-sky-100 text-sky-800">{i.topic}</span>
+                            <span className="text-slate-400">{new Date(i.created_at).toLocaleString()}</span>
+                        </div>
+                    </div>
+                    {i.message && <p className="text-sm text-slate-800 mt-2 whitespace-pre-wrap">{i.message}</p>}
+                    <div className="mt-2 text-xs flex items-center gap-3">
+                        {i.handled_at
+                            ? <><span className="text-green-700">Handled by {i.handled_by_name} {new Date(i.handled_at).toLocaleDateString()}</span><button className="text-slate-500" onClick={() => mark(i.id, false)}>Reopen</button></>
+                            : <button className="btn-ghost !py-1" onClick={() => mark(i.id, true)}><span className="icon-check"></span>Mark handled</button>}
+                    </div>
+                </div>
+            ))}
+        </div>
     );
 }

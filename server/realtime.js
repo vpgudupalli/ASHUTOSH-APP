@@ -48,6 +48,10 @@ export async function notifyCareTeam(patientId, event, payload) {
   io.to(await careTeamRooms(patientId)).emit(event, payload);
 }
 
+export function notifyAdmins(event, payload) {
+  io?.to('admins').emit(event, payload);
+}
+
 export function notifyUser(userId, event, payload) {
   io?.to(`user:${userId}`).emit(event, payload);
 }
