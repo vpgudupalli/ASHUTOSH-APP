@@ -200,3 +200,10 @@ details p { margin: .8rem 0 0; }
 .site-footer p { color: #94a3b8; font-size: .9rem; }
 .footer-bottom { border-top: 1px solid #1e293b; margin-top: 40px; padding-top: 20px; display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; font-size: .82rem; color: #94a3b8; }
 .emergency { background: #fef2f2; border-bottom: 1px solid #fecaca; color: #7f1d1d; font-size: .82rem; text-align: center; padding: 6px 12px; }
+
+/* Team bios */
+.person .credentials { font-size: .8rem; color: var(--muted); font-weight: 600; margin: -.2rem 0 .35rem; }
+.person details.bio { border: none; padding: 0; background: none; text-align: left; margin-bottom: 1rem; }
+.person details.bio summary { justify-content: center; color: var(--brand); font-size: .9rem; }
+.person details.bio summary::after { margin-left: .4rem; }
+.person details.bio p { font-size: .9rem; }

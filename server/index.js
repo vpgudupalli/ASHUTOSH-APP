@@ -70,7 +70,8 @@ if (fs.existsSync(DIST)) {
 app.get(['/login', '/signin'], (req, res) => res.redirect('/app/'));
 
 // Public website (company pages + Risk Navigator landing page) at the root.
-app.use(express.static(SITE, { extensions: ['html'], maxAge: '1h' }));
+// no-cache: browsers revalidate on each visit, so website edits show up immediately.
+app.use(express.static(SITE, { extensions: ['html'], cacheControl: true, setHeaders: (res) => res.set('Cache-Control', 'no-cache') }));
 app.use((req, res) => res.status(404).sendFile(path.join(SITE, '404.html')));
 
 app.use((err, req, res, next) => {
