@@ -1,0 +1,69 @@
+/* =====================================================================
+   Hospital-quality layer: clinical palette, medical-cross texture,
+   quality pillars strip, safety/quality sections and badges.
+   Loaded after theme.css.
+   ===================================================================== */
+:root {
+  --clinical: #0b5fa5;
+  --clinical-2: #0a4c86;
+  --clinical-soft: #e8f2fc;
+  --care-teal: #0f9b8e;
+  --safety-green: #15803d;
+}
+
+/* Subtle medical-cross texture on soft sections */
+.section.soft {
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='44' height='44' viewBox='0 0 44 44'%3E%3Cpath d='M20 14h4v6h6v4h-6v6h-4v-6h-6v-4h6z' fill='%230b5fa5' fill-opacity='.05'/%3E%3C/svg%3E") 0 0 / 44px 44px,
+    linear-gradient(180deg, #f7fbff, #f1f7fd);
+}
+
+/* Medical cross mark for brand + accents */
+.brand-mark { background: linear-gradient(135deg, #0b5fa5, #0f9b8e); box-shadow: 0 6px 16px -6px rgba(11, 95, 165, .6), inset 0 1px 0 rgba(255, 255, 255, .3); }
+
+/* Quality pillars strip (sits right under each hero) */
+.quality-strip { position: relative; z-index: 3; margin-top: -56px; }
+.quality-strip .pillars { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0; background: #fff; border: 1px solid #dbe7f3; border-radius: 18px; box-shadow: 0 30px 60px -30px rgba(11, 95, 165, .45), 0 0 0 1px rgba(255, 255, 255, .6) inset; overflow: hidden; }
+.pillar { padding: 20px 18px; display: flex; gap: 12px; align-items: flex-start; border-right: 1px solid #e6eef7; position: relative; transition: background .3s; }
+.pillar:last-child { border-right: none; }
+.pillar:hover { background: linear-gradient(180deg, #f5faff, #fff); }
+.pillar::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px; background: var(--pc, #0b5fa5); opacity: .85; }
+.pillar svg { width: 30px; height: 30px; flex-shrink: 0; color: var(--pc, #0b5fa5); padding: 5px; border-radius: 9px; background: color-mix(in srgb, var(--pc, #0b5fa5) 12%, white); }
+.pillar b { display: block; font-size: .92rem; color: var(--ink); line-height: 1.25; }
+.pillar span { display: block; font-size: .76rem; color: var(--muted); line-height: 1.35; margin-top: 2px; }
+@media (max-width: 980px) {
+  .quality-strip .pillars { grid-template-columns: repeat(2, 1fr); }
+  .pillar { border-bottom: 1px solid #e6eef7; }
+  .pillar:nth-child(2n) { border-right: none; }
+  .pillar:last-child { grid-column: 1 / -1; border-bottom: none; }
+}
+@media (max-width: 520px) { .quality-strip { margin-top: -40px; } .pillar { padding: 14px; } }
+
+/* Quality & safety section */
+.qs-panel { background: linear-gradient(160deg, #0a2a4f, #0b3d6e 55%, #0c5560); color: #e2ecf7; border-radius: 22px; padding: 44px; position: relative; overflow: hidden; box-shadow: 0 40px 80px -40px rgba(11, 61, 110, .8); }
+.qs-panel::before { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .5; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='44' height='44' viewBox='0 0 44 44'%3E%3Cpath d='M20 14h4v6h6v4h-6v6h-4v-6h-6v-4h6z' fill='%23ffffff' fill-opacity='.05'/%3E%3C/svg%3E") 0 0 / 44px 44px; }
+.qs-panel > * { position: relative; }
+.qs-panel h2, .qs-panel h3 { color: #fff; }
+.qs-panel p { color: #c7d7ea; }
+.qs-panel .eyebrow { color: #7dd3fc; }
+.qs-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 26px; }
+@media (max-width: 920px) { .qs-grid { grid-template-columns: 1fr 1fr; } .qs-panel { padding: 30px 22px; } }
+@media (max-width: 560px) { .qs-grid { grid-template-columns: 1fr; } }
+.qs-item { background: rgba(255, 255, 255, .06); border: 1px solid rgba(255, 255, 255, .12); border-radius: 14px; padding: 18px; backdrop-filter: blur(4px); transition: transform .3s, background .3s; }
+.qs-item:hover { transform: translateY(-4px); background: rgba(255, 255, 255, .1); }
+.qs-item b { display: flex; align-items: center; gap: .5rem; color: #fff; font-size: .98rem; margin-bottom: .35rem; }
+.qs-item b::before { content: ""; width: 10px; height: 10px; border-radius: 3px; background: var(--qc, #38bdf8); box-shadow: 0 0 10px var(--qc, #38bdf8); flex-shrink: 0; }
+.qs-item span { font-size: .86rem; color: #b9cbe0; }
+
+/* Framework chips */
+.frameworks { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+.frameworks span { font-size: .76rem; font-weight: 650; letter-spacing: .02em; padding: .38rem .75rem; border-radius: 999px; color: #e0f2fe; border: 1px solid rgba(125, 211, 252, .35); background: rgba(125, 211, 252, .08); }
+
+/* Quality seal used in footer */
+.seal { display: inline-flex; align-items: center; gap: .55rem; margin-top: 1rem; padding: .5rem .8rem; border-radius: 10px; border: 1px solid #1e3a5f; background: rgba(14, 165, 233, .06); color: #cbd5e1; font-size: .8rem; }
+.seal svg { width: 22px; height: 22px; color: #38bdf8; }
+
+/* Make room for the pillars strip and keep the heartbeat line visible above it */
+.hero { padding-bottom: 170px; }
+.page-hero { padding-bottom: 150px; }
+.hero .ecg, .page-hero .ecg { bottom: 70px; }

@@ -14,11 +14,11 @@ export default function Header({ user, route, onLogout }) {
     );
 
     return (
-        <header className="app-header bg-white border-b border-slate-200 sticky top-0 z-50">
+        <header className="app-header clinical-header bg-white border-b border-slate-200 sticky top-0 z-50">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
                 <button onClick={() => navigate('/')} className="flex items-center gap-3 text-left">
-                    <div className="bg-[var(--primary)] p-2 rounded-lg">
-                        <div className="icon-activity text-white text-xl"></div>
+                    <div className="brand-cross p-2 rounded-lg">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinejoin="round" aria-hidden="true"><path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6z" /></svg>
                     </div>
                     <div>
                         <h1 className="text-xl font-bold text-slate-900 leading-none">Ashutosh Services</h1>

@@ -33,7 +33,9 @@ export default function Login({ onSignedIn, notice, inviteCode }) {
     const titles = { login: 'Sign in', register: 'Join with your invite code', mfa: 'Two-step verification' };
 
     return (
-        <div className="max-w-md mx-auto py-6">
+        <div className="max-w-5xl mx-auto py-2 lg:py-6 grid lg:grid-cols-[1.05fr_1fr] gap-8 items-stretch">
+            <ClinicalPanel />
+            <div className="w-full max-w-md mx-auto lg:mx-0 self-center">
             {notice && <div className="mb-4 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">{notice}</div>}
             <div className="card">
                 <div className="flex flex-col items-center text-center mb-6">
@@ -97,6 +99,38 @@ export default function Login({ onSignedIn, notice, inviteCode }) {
                 )}
                 <p className="text-xs text-slate-400 text-center mt-4">No invite code? Ask your nurse, provider or case manager. Staff accounts are created by your administrator.</p>
             </div>
+            </div>
+        </div>
+    );
+}
+
+const PILLARS = [
+    ['#f87171', 'Patient safety', 'Emergency symptoms and safety screens escalate the same day'],
+    ['#38bdf8', 'Clinical quality', 'Validated screening tools and evidence-based risk tiers'],
+    ['#a78bfa', 'Health equity', 'Social needs, language and disability accommodations'],
+    ['#2dd4bf', 'Privacy & compliance', 'HIPAA safeguards, two-step sign-in, full audit trail'],
+];
+
+// Branding panel shown beside the sign-in form on larger screens.
+function ClinicalPanel() {
+    return (
+        <div className="clinical-panel hidden lg:flex flex-col justify-between rounded-2xl p-8 text-slate-200">
+            <div>
+                <div className="text-xs font-bold tracking-widest uppercase text-sky-300">Risk Navigator</div>
+                <h2 className="!text-white text-3xl leading-tight mt-2">Hospital-grade quality,<br />between every visit.</h2>
+                <p className="text-slate-300 mt-3 text-sm">Secure check-ins, evidence-based risk stratification and closed-loop follow-up for patients and their care team.</p>
+            </div>
+            <ul className="space-y-3 my-8">
+                {PILLARS.map(([c, t, d]) => (
+                    <li key={t} className="flex gap-3">
+                        <span className="mt-1.5 w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: c, boxShadow: `0 0 10px ${c}` }}></span>
+                        <span><b className="text-white text-sm">{t}</b><span className="block text-xs text-slate-400">{d}</span></span>
+                    </li>
+                ))}
+            </ul>
+            <svg className="clinical-ecg" viewBox="0 0 400 50" preserveAspectRatio="none" aria-hidden="true">
+                <path d="M0 30 L120 30 L132 26 L142 30 L152 30 L158 38 L168 6 L178 44 L186 30 L204 30 L220 22 L236 30 L400 30" />
+            </svg>
         </div>
     );
 }
