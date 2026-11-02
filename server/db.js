@@ -161,6 +161,9 @@ export async function migrate() {
     ALTER TABLE patients ADD COLUMN IF NOT EXISTS invite_hash TEXT;
     ALTER TABLE patients ADD COLUMN IF NOT EXISTS invite_expires_at TIMESTAMPTZ;
 
+    -- Deleted users keep their row (so history still shows who did what) but lose access and their email.
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+
     -- Demo / contact requests from the public website.
     CREATE TABLE IF NOT EXISTS inquiries (
       id SERIAL PRIMARY KEY,

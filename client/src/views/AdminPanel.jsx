@@ -226,6 +226,26 @@ function Users({ push }) {
     }, [push]);
     React.useEffect(load, [load]);
 
+    const remove = async (u) => {
+        const ok = window.confirm([
+            `Delete ${u.name} (${u.email})?`,
+            '',
+            '• They can no longer sign in, and the email is freed so you can create a new account with it in any role.',
+            '• Notes, messages and history they created keep their name, and the deletion is recorded in the audit log.',
+            u.role === 'patient'
+                ? '• Their patient health record stays in the system (without a login) – you can invite them again later.'
+                : '• They are removed from all care teams.',
+            '',
+            'This cannot be undone.',
+        ].join('\n'));
+        if (!ok) return;
+        try {
+            await api(`/admin/users/${u.id}`, { method: 'DELETE' });
+            push({ title: `${u.name} deleted` });
+            load();
+        } catch (e) { push({ error: true, title: e.message }); }
+    };
+
     const update = async (id, body, msg) => {
         try {
             await api(`/admin/users/${id}`, { method: 'PATCH', body });
@@ -283,6 +303,7 @@ function Users({ push }) {
                                     <button className={u.active ? 'text-red-600' : 'text-green-700'} onClick={() => update(u.id, { active: !u.active }, u.active ? 'Account disabled' : 'Account enabled')}>
                                         {u.active ? 'Disable' : 'Enable'}
                                     </button>
+                                    <button className="text-red-700 ml-3 font-medium" onClick={() => remove(u)}>Delete</button>
                                 </td>
                             </tr>
                         ))}

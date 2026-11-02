@@ -37,7 +37,7 @@ router.get('/users', h(async (req, res) => {
   const users = await query(
     `SELECT id, email, name, role, active, mfa_enabled, last_login_at, created_at,
             (locked_until IS NOT NULL AND locked_until > now()) AS locked
-       FROM users ORDER BY role, name`
+       FROM users WHERE deleted_at IS NULL ORDER BY role, name`
   );
   res.json({ users });
 }));
@@ -88,6 +88,31 @@ router.patch('/users/:id', h(async (req, res) => {
   if (resetMfa) await query('UPDATE users SET mfa_enabled = FALSE, mfa_secret = NULL WHERE id = $1', [id]);
   if (unlock) await query('UPDATE users SET failed_logins = 0, locked_until = NULL WHERE id = $1', [id]);
   audit(req.user.id, 'user_update', null, `user #${id}: ${Object.keys(req.body).join(',')}`, ipOf(req));
+  res.json({ ok: true });
+}));
+
+// Delete a user: access is removed and the email is freed for reuse, but the row is kept
+// (anonymized login) so notes, messages and the audit trail still show who did what.
+router.delete('/users/:id', h(async (req, res) => {
+  const id = Number(req.params.id);
+  if (id === req.user.id) return res.status(400).json({ error: "You can't delete your own account" });
+  const target = await one('SELECT id, email, name, role FROM users WHERE id = $1 AND deleted_at IS NULL', [id]);
+  if (!target) return res.status(404).json({ error: 'User not found' });
+  if (target.role === 'admin') {
+    const admins = await one("SELECT count(*)::int AS n FROM users WHERE role = 'admin' AND active AND deleted_at IS NULL", []);
+    if (admins.n <= 1) return res.status(400).json({ error: "You can't delete the last administrator" });
+  }
+  const patients = await query('UPDATE patients SET user_id = NULL WHERE user_id = $1 RETURNING id', [id]);
+  const teams = await query('DELETE FROM assignments WHERE staff_id = $1 RETURNING patient_id', [id]);
+  await query(
+    `UPDATE users SET email = 'deleted-' || id || '-' || floor(extract(epoch from now()))::bigint || '@removed.invalid',
+            active = FALSE, deleted_at = now(), password_hash = '!', mfa_secret = NULL, mfa_enabled = FALSE,
+            failed_logins = 0, locked_until = NULL WHERE id = $1`,
+    [id]
+  );
+  audit(req.user.id, 'user_delete', patients[0]?.id ?? null, `${target.role} #${id} ${target.name} <${target.email}>`, ipOf(req));
+  [...patients.map((p) => p.id), ...teams.map((t) => t.patient_id)].forEach((pid) => notifyCareTeam(pid, 'patients:changed', { patientId: pid }));
+  notifyUser(id, 'session:ended', {});
   res.json({ ok: true });
 }));
 
