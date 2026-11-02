@@ -67,7 +67,16 @@ router.patch('/users/:id', h(async (req, res) => {
   const { active, role, password, resetMfa, unlock } = req.body;
   if (typeof active === 'boolean') await query('UPDATE users SET active = $1 WHERE id = $2', [active, id]);
   if (role !== undefined) {
-    if (!['admin', ...STAFF_ROLES].includes(role) || target.role === 'patient') return res.status(400).json({ error: 'Invalid role change' });
+    if (!['admin', ...STAFF_ROLES].includes(role)) return res.status(400).json({ error: 'Invalid role change' });
+    if (target.role === 'patient') {
+      // Converting a patient login into a staff/admin login: the patient record stays,
+      // but is unlinked from this login so the person no longer sees it as a patient.
+      const linked = await query('UPDATE patients SET user_id = NULL WHERE user_id = $1 RETURNING id', [id]);
+      linked.forEach((p) => {
+        audit(req.user.id, 'patient_login_converted', p.id, `user #${id} -> ${role}`, ipOf(req));
+        notifyCareTeam(p.id, 'patients:changed', { patientId: p.id });
+      });
+    }
     await query('UPDATE users SET role = $1 WHERE id = $2', [role, id]);
   }
   if (password) {

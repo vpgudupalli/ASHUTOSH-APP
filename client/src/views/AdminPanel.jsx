@@ -256,11 +256,20 @@ function Users({ push }) {
                                 <td className="px-4 py-2.5 font-medium text-slate-800">{u.name}</td>
                                 <td className="px-4 py-2.5 text-slate-600">{u.email}</td>
                                 <td className="px-4 py-2.5">
-                                    {u.role === 'patient' ? ROLE_LABELS.patient : (
-                                        <select value={u.role} onChange={(e) => update(u.id, { role: e.target.value }, 'Role updated')} className="!py-1 !px-2 text-sm !w-auto">
-                                            {STAFF_ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
-                                        </select>
-                                    )}
+                                    <select
+                                        value={u.role}
+                                        onChange={(e) => {
+                                            const role = e.target.value;
+                                            if (u.role === 'patient' && !window.confirm(
+                                                `Make ${u.name} a ${ROLE_LABELS[role]}?\n\nTheir login becomes a staff login. Their patient record stays in the system but is no longer linked to this login (you can send a new invite later if needed).`
+                                            )) { e.target.value = u.role; return; }
+                                            update(u.id, { role }, u.role === 'patient' ? `${u.name} is now ${ROLE_LABELS[role]}` : 'Role updated');
+                                        }}
+                                        className="!py-1 !px-2 text-sm !w-auto"
+                                    >
+                                        {u.role === 'patient' && <option value="patient" disabled>{ROLE_LABELS.patient}</option>}
+                                        {STAFF_ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+                                    </select>
                                 </td>
                                 <td className="px-4 py-2.5">
                                     {u.active ? 'Active' : 'Disabled'}
