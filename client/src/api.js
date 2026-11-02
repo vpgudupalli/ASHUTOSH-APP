@@ -14,6 +14,7 @@ export async function api(path, { method = 'GET', body } = {}) {
     if (data.code === 'MFA_SETUP_REQUIRED') window.dispatchEvent(new Event('mfa-required'));
     const err = new Error(data.error || `Request failed (${res.status})`);
     err.status = res.status;
+    err.data = data;
     throw err;
   }
   return data;

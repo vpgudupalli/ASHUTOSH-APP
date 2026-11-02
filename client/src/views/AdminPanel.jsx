@@ -289,7 +289,7 @@ function Users({ push }) {
                     </tbody>
                 </table>
             </div>
-            {creating && <NewStaff onClose={() => setCreating(false)} onDone={() => { setCreating(false); push({ title: 'Account created' }); load(); }} />}
+            {creating && <NewStaff onClose={() => setCreating(false)} onDone={(msg) => { setCreating(false); push({ title: msg || 'Account created' }); load(); }} />}
             {resetting && (
                 <ResetPassword
                     user={resetting}
@@ -304,12 +304,24 @@ function Users({ push }) {
 function NewStaff({ onClose, onDone }) {
     const [form, setForm] = React.useState({ name: '', email: '', role: 'provider', password: '' });
     const [error, setError] = React.useState('');
-    const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+    const [existing, setExisting] = React.useState(null);
+    const set = (k) => (e) => { setExisting(null); setForm((f) => ({ ...f, [k]: e.target.value })); };
     const submit = async (e) => {
         e.preventDefault();
+        setExisting(null);
         try {
             await api('/admin/users', { method: 'POST', body: form });
             onDone();
+        } catch (err) {
+            setError(err.message);
+            if (err.data?.existing) setExisting(err.data.existing);
+        }
+    };
+    // The email already belongs to someone: change that account's role instead of creating a new one.
+    const convert = async () => {
+        try {
+            await api(`/admin/users/${existing.id}`, { method: 'PATCH', body: { role: form.role } });
+            onDone(`${existing.name} is now ${ROLE_LABELS[form.role]}`);
         } catch (err) { setError(err.message); }
     };
     return (
@@ -328,7 +340,19 @@ function NewStaff({ onClose, onDone }) {
                     <input type="text" value={form.password} onChange={set('password')} minLength={10} required />
                     <p className="text-xs text-slate-400 mt-1">Share this with them securely. At least 10 characters, letters and numbers.</p>
                 </div>
-                {error && <div className="text-sm text-red-700 bg-red-50 rounded-md px-3 py-2">{error}</div>}
+                {error && !existing && <div className="text-sm text-red-700 bg-red-50 rounded-md px-3 py-2">{error}</div>}
+                {existing && (
+                    <div className="text-sm bg-sky-50 border border-sky-200 rounded-md px-3 py-3 space-y-2">
+                        <p className="text-slate-700">
+                            <b>{existing.name}</b> already has an account with this email as <b>{ROLE_LABELS[existing.role]}</b>.
+                            {existing.role === 'patient' && ' Their patient record will stay in the system but no longer be linked to this login.'}
+                            {' '}They keep their own password – no temporary password needed.
+                        </p>
+                        {existing.role !== form.role && (
+                            <button type="button" className="btn-primary" onClick={convert}>Make this account {ROLE_LABELS[form.role]}</button>
+                        )}
+                    </div>
+                )}
                 <div className="flex justify-end gap-2">
                     <button type="button" className="btn-ghost" onClick={onClose}>Cancel</button>
                     <button type="submit" className="btn-primary">Create</button>

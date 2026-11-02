@@ -50,7 +50,8 @@ router.post('/users', h(async (req, res) => {
   if (!['admin', ...STAFF_ROLES].includes(role)) return res.status(400).json({ error: 'Invalid role' });
   const problem = passwordProblem(req.body.password);
   if (problem) return res.status(400).json({ error: `Temporary password: ${problem.toLowerCase()}` });
-  if (await one('SELECT 1 FROM users WHERE email = $1', [email])) return res.status(409).json({ error: 'An account with that email already exists' });
+  const existing = await one('SELECT id, name, role FROM users WHERE email = $1', [email]);
+  if (existing) return res.status(409).json({ error: 'An account with that email already exists', existing });
   const user = await one(
     'INSERT INTO users (email, password_hash, name, role) VALUES ($1, $2, $3, $4) RETURNING id',
     [email, await hashPassword(req.body.password), name, role]
